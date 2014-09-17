@@ -1,3 +1,5 @@
+import numpy as np
+
 class LFSR(object):
     taps = {
         2: (2, 1),
@@ -58,6 +60,15 @@ class LFSR(object):
             "lfsr does not produce maximum length sequence. Produces " + \
             "length %d sequence" % ctr
 
+def collect_lfsr_sequence(nbits, seed=0b00000001):
+    """generate a max length sequence of lfsr states"""
+    lfsr = LFSR(nbits, seed)
+    states = []
+    for i in xrange(2**nbits-1):
+        states.append(lfsr.get_next_state())
+    states = np.array(states)
+    return states
+
 def test_lfsr():
     """test that lfsr produces maximum length sequences"""
     for nbits in xrange(2,20):
@@ -66,15 +77,29 @@ def test_lfsr():
 
 def test_lfsr_distribution():
     """test that the lfsr has uniform distribution"""
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     for nbits in xrange(2,20):
-        states = []
-        lfsr = LFSR(nbits, 0b00000001)
-        for i in xrange(2**nbits-1):
-            states.append(lfsr.get_next_state())
-        states = np.array(states)
+        states = collect_lfsr_sequence(nbits)
         unique_states = np.unique(states)
         assert len(unique_states) == len(states), \
             "%d bit lfsr does not produce uniform states." % nbits
+
+def lfsr_autocorrelation():
+    """look at the autocorrelation of the lfsr"""
+    import matplotlib.pyplot as plt
+    from scipy.signal import fftconvolve
+
+    fig = plt.figure(figsize=(20,12))
+    for idx, nbits in enumerate(xrange(2,20)):
+        print 'plotting autocorrelation for %d bit lfsr' % nbits
+        ax = fig.add_subplot(3,6,idx+1)
+        states = collect_lfsr_sequence(nbits)
+        mu = np.mean(states)
+        states_0ed = states - mu
+        #autocor = np.correlate(states_0ed, states_0ed, mode='full') # way slow
+        autocor = fftconvolve(states_0ed, states_0ed[::-1]) # way faster
+        ax.plot(autocor, '-o')
+        ax.set_title('%d bits' % nbits)
+    fig.suptitle('autocorrelation of nbit lfsr sequences')
+    plt.show()
+
+lfsr_autocorrelation()
