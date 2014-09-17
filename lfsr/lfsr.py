@@ -58,20 +58,23 @@ class LFSR(object):
             "lfsr does not produce maximum length sequence. Produces " + \
             "length %d sequence" % ctr
 
-for nbits in xrange(2,20):
-    lfsr = LFSR(nbits, 0b00000001)
-    lfsr.test()
+def test_lfsr():
+    """test that lfsr produces maximum length sequences"""
+    for nbits in xrange(2,20):
+        lfsr = LFSR(nbits, 0b00000001)
+        lfsr.test()
 
-# nbits = 8
-# 
-# outputs = []
-# states = []
-# 
-# for xor, sr in lfsr(nbits, 0b00000001)():
-#     outputs.append(xor)
-#     states.append(sr)
-#     print xor, bin(2**nbits+sr)[3:]
-# 
-# assert 2**nbits-1 == len(outputs), "lfsr must be maximum length sequence lfsr"
+def test_lfsr_distribution():
+    """test that the lfsr has uniform distribution"""
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-
+    for nbits in xrange(2,20):
+        states = []
+        lfsr = LFSR(nbits, 0b00000001)
+        for i in xrange(2**nbits-1):
+            states.append(lfsr.get_next_state())
+        states = np.array(states)
+        unique_states = np.unique(states)
+        assert len(unique_states) == len(states), \
+            "%d bit lfsr does not produce uniform states." % nbits
