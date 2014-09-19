@@ -1,8 +1,9 @@
 import numpy as np
 from lfsr import LFSR
 
+
 def AsBBit(x, B):
-    """Converts a real number to a B-bit representation
+    """Converts a probability to a B-bit representation
 
     Rounds probabilistically
     """
@@ -18,11 +19,13 @@ def AsBBit(x, B):
     else:
         return np.floor(scaled_x) + 1
 
-def extract_distribution(w)
+
+def extract_distribution(ptree):
     """Extract distribution from ptree in binary heap format"""
-    w_apx = np.zeros(h.shape)
-    FlattenPtreeRecur(h, w_apx, 1, 1)
+    w_apx = np.zeros(ptree.shape)
+    FlattenPtreeRecur(ptree, w_apx, 1, 1)
     return w_apx
+
 
 def FlattenPtreeRecur(h, w_apx, i, x):
     if (i < len(h)):
@@ -32,7 +35,8 @@ def FlattenPtreeRecur(h, w_apx, i, x):
         FlattenPtreeRecur(h, w_apx, 2*i + 1, x_r)
     else:
         assert(i < 2*len(h) and i >= len(h))
-        w_apx[i - len(h)] = x 
+        w_apx[i - len(h)] = x
+
 
 class ProbTree(object):
     """Represents a weight distribution as a probability tree
@@ -45,7 +49,7 @@ class ProbTree(object):
     """
 
     def __init__(self, nbits, lfsr_seed=0b1, w_dist=None):
-        assert nbits >1, "must use more than 1 bit"
+        assert nbits > 1, "must use more than 1 bit"
         self.nbits = nbits
         self.lfsr = LFSR(nbits, lfsr_seed)
 
@@ -77,14 +81,15 @@ class ProbTree(object):
         else:
             return w[i-len(w)]
 
-    def sample_tree(self):
+    def sample(self):
+        assert self.tree is not None, "must build tree from distribution first"
         i = 1
         len_w = self.tree.shape[0]
 
-        while i<len_w:
-            r = self.lfsr.get_next_state()
-            if r<self.tree[i]:
+        while i < len_w:
+            r = float(self.lfsr.sample())/2**self.nbits
+            if r < self.tree[i]:
                 i = i*2
             else:
                 i = i*2 + 1
-        return i
+        return i-len_w
