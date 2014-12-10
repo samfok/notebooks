@@ -110,3 +110,170 @@ def iter_alif_fi(u, tau, tref, xt, af=1e-3, max_iter=100, rel_tol=1e-3,
     if verbose:
         print exit_msg
     return f_ret
+
+
+def run_lifsoma(dt, u, tau, tref, xt, ret_state=False, flatten1=True):
+    """Simulates an LIF soma(s) given an input current
+
+    Returns the spike times of the LIF soma
+
+    Parameters
+    ----------
+    dt : float
+        time step (s)
+    u : array-like (m x n)
+        inputs for each time step
+    tau : float
+        time constant (s)
+    xt : float
+        threshold
+    ret_state : boolean (optional)
+        whether to also return the soma state
+    flatten1 : boolean (optional)
+        whether to flatten the outputs if there is only 1 neuron
+    """
+    nneurons = 1
+    if len(u.shape) > 1:
+        nneurons = u.shape[1]
+    nsteps = u.shape[0]
+    if nneurons == 1:
+        u.shape = u.shape[0], 1
+
+    decay = np.exp(-dt/tau)
+    increment = (1-decay)
+
+    spiketimes = [[] for i in xrange(nneurons)]
+    state = np.zeros(u.shape)
+    refractory_time = np.zeros(nneurons)
+
+    for i in xrange(1, nsteps):
+        # update soma state with prev state and input 
+        state[i, :] = decay*state[i-1, :] + increment*u[i, :]
+        dV = state[i, :]-state[i-1, :]
+
+        # update refractory period assuming no spikes for now
+        refractory_time -= dt
+
+        # set voltages of neurons still in their refractory period to 0
+        # and reduce voltage of neurons partway out of their ref. period
+        state[i, :] *= (1-refractory_time/dt).clip(0, 1)
+
+        # determine which neurons spike
+        spiked = state[i, :] > xt
+        spiked_idx = np.nonzero(spiked)[0]
+
+        # linearly approximate time since neuron crossed spike threshold
+        overshoot = (state[i, spiked] - xt) / dV[spiked]
+        interp_spiketime = dt * (1-overshoot)
+
+        for idx, spk_t in zip(spiked_idx, interp_spiketime):
+            spiketimes[idx].append(spk_t+i*dt)
+
+        # set spiking neurons' voltages to zero, and ref. time to tref
+        state[i, spiked] = 0
+        refractory_time[spiked] = tref + interp_spiketime
+
+    if nneurons == 1 and flatten1:
+        spiketimes = np.array(spiketimes[0])
+    else:
+        for idx in xrange(nneurons):
+            spiketimes[idx] = np.array(spiketimes[idx])
+
+    if ret_state:
+        retval = spiketimes, state
+    else:
+        retval = spiketimes
+    return retval
+
+
+def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-3,
+                 ret_state=False, ret_fstate=False, flatten1=True):
+    """Simulates an adaptive LIF soma(s) given an input current
+
+    Returns the spike times of the LIF soma
+
+    Parameters
+    ----------
+    dt : float
+        time step (s)
+    u : array-like (m x n)
+        inputs for each time step
+    tau : float
+        time constant (s)
+    xt : float
+        threshold
+    af : float (optional)
+        scales the feedback synapse state into a current
+    tauf : float (optional)
+        time constant of the feedback synapse
+    ret_state : boolean (optional)
+        whether to also return the soma state
+    ret_fstate : boolean (optional)
+        whether to also return the feedback synapse state
+    flatten1 : boolean (optional)
+        whether to flatten the outputs if there is only 1 neuron
+    """
+    nneurons = 1
+    if len(u.shape) > 1:
+        nneurons = u.shape[1]
+    nsteps = u.shape[0]
+    if nneurons == 1:
+        u.shape = u.shape[0], 1
+
+    decay = np.exp(-dt/tau)
+    increment = (1-decay)
+
+    fdecay = np.exp(-dt/tauf)
+    fincrement = (1-fdecay)
+
+    spiketimes = [[] for i in xrange(nneurons)]
+    state = np.zeros(u.shape)
+    fstate = np.zeros((u.shape[0]+1, u.shape[1]))  # +1 for end point edge case
+    refractory_time = np.zeros(nneurons)
+
+    for i in xrange(1, nsteps):
+        # update soma state with prev state, input, and feedback
+        state[i, :] = (decay*state[i-1, :] + increment*u[i, :] -
+                       af*fstate[i, :])
+        dV = state[i, :]-state[i-1, :]
+
+        # update refractory period assuming no spikes for now
+        refractory_time -= dt
+
+        # set voltages of neurons still in their refractory period to 0
+        # and reduce voltage of neurons partway out of their ref. period
+        state[i, :] *= (1-refractory_time/dt).clip(0, 1)
+
+        # determine which neurons spike
+        spiked = state[i, :] > xt
+        spiked_idx = np.nonzero(spiked)[0]
+
+        # update feedback
+        fstate[i+1, :] = fdecay*fstate[i, :] + fincrement*spiked/dt
+
+        # linearly approximate time since neuron crossed spike threshold
+        overshoot = (state[i, spiked] - xt) / dV[spiked]
+        interp_spiketime = dt * (1-overshoot)
+
+        for idx, spk_t in zip(spiked_idx, interp_spiketime):
+            spiketimes[idx].append(spk_t+i*dt)
+
+        # set spiking neurons' voltages to zero, and ref. time to tref
+        state[i, spiked] = 0
+        refractory_time[spiked] = tref + interp_spiketime
+    fstate = fstate[:-1, :]
+
+    if nneurons == 1 and flatten1:
+        spiketimes = np.array(spiketimes[0])
+    else:
+        for idx in xrange(nneurons):
+            spiketimes[idx] = np.array(spiketimes[idx])
+
+    retval = spiketimes
+    if ret_state or ret_fstate:
+        retval = [retval]
+    if ret_state:
+        retval.append(state)
+    if ret_fstate:
+        retval.append(fstate)
+    return retval

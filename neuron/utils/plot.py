@@ -40,7 +40,6 @@ def _set_ax(ax, axhline=None, axhlinep={}, axvline=None, axvlinep={},
     if yticklabels is not None:
         ax.set_yticklabels(yticklabels)
     if len(legendp) != 0:
-        print legendp
         ax.legend(**legendp)
     if xlabel is not None:
         ax.set_xlabel(xlabel, **xlabelp)
