@@ -27,6 +27,7 @@ def th_lif_fi(u, tau, tref, xt):
     f[idx] = (tref-tau*np.log(1.-xt/u[idx]))**-1.
     return f
 
+
 def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
     """First order Taylor series approximation of the LIF tuning curve
     
