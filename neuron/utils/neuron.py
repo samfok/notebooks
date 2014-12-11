@@ -20,13 +20,68 @@ def th_lif_fi(u, tau, tref, xt):
     xt : float
         threshold
     """
-    # handle scalars
-    if isinstance(u, (int, float)):
+    if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
-    # handle arrays
     f = np.zeros(u.shape)
     idx = u > xt
-    f[idx] = (tref-tau*np.log((u[idx]-xt)/(u[idx])))**(-1.)
+    f[idx] = (tref-tau*np.log(1.-xt/u[idx]))**-1.
+    return f
+
+def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
+    """First order Taylor series approximation of the LIF tuning curve
+    
+    Parameters
+    ----------
+    a: float
+        input value around which to approximate
+    u : array-like of floats
+        input
+    tau : float
+        membrane time constant
+    tref : float
+        refractory period
+    xt : float
+        threshold
+    clip_subxt : boolean (optional)
+        Whether to clip negative values in the approximation to 0
+    """
+    assert a > xt, "a must be > xt"
+    if isinstance(u, (int, float)):  # handle scalars
+        u = np.array([u])
+    k1 = tau*xt/((tref-tau*np.log(1-xt/a))**2*a*(a-xt))
+    k0 = th_lif_fi(a, tau, tref, xt) - k1*a
+    f = k0 + k1*u
+    if clip_subxt:
+        f[f < 0.] = 0.
+    return f
+              
+
+def taylor1log_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
+    """First order Taylor series approximation of the LIF tuning curve
+    
+    Parameters
+    ----------
+    a: float
+        input value around which to approximate
+    u : array-like of floats
+        input
+    tau : float
+        membrane time constant
+    tref : float
+        refractory period
+    xt : float
+        threshold
+    clip_subxt : boolean (optional)
+        Whether to clip negative values in the approximation to 0
+    """
+    assert a > xt, "a must be > xt"
+    if isinstance(u, (int, float)):  # handle scalars
+        u = np.array([u])
+    k0 = -tau*(np.log(1.-xt/a)+xt/(a-xt))
+    k1 = tau*xt/(a*(a-xt))
+    f = (tref + k0 + k1*u)**-1
+    if clip_subxt:
+        f[f < 0.] = 0.
     return f
 
 
@@ -78,8 +133,7 @@ def iter_alif_fi(u, tau, tref, xt, af=1e-3, max_iter=100, rel_tol=1e-3,
         tol*af
     """
     assert af > 0, "inhibitory feedback scaling must be > 0"
-    # handle scalars
-    if isinstance(u, (int, float)):
+    if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
 
     f_high = th_lif_fi(u, tau, tref, xt)
