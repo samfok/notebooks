@@ -107,9 +107,9 @@ def th_lif_if(f, tau, tref, xt):
     return u
 
 
-def iter_alif_fi(u, tau, tref, xt, af=1e-3, max_iter=100, rel_tol=1e-3,
+def num_alif_fi(u, tau, tref, xt, af=1e-3, max_iter=100, rel_tol=1e-3,
                  verbose=False):
-    """Iteratively find rate-based adaptive LIF tuning curve
+    """Numerically find rate-based adaptive LIF tuning curve
 
     Uses binary search to find the steady state firing rate of an adaptive LIF
     neuron.
@@ -254,7 +254,7 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-3,
     u : array-like (m x n)
         inputs for each time step
     tau : float
-        time constant (s)
+        soma time constant (s)
     xt : float
         threshold
     af : float (optional)
@@ -288,8 +288,8 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-3,
 
     for i in xrange(1, nsteps):
         # update soma state with prev state, input, and feedback
-        state[i, :] = (decay*state[i-1, :] + increment*u[i, :] -
-                       af*fstate[i, :])
+        state[i, :] = (decay*state[i-1, :] + 
+                       increment*(u[i, :] - af*fstate[i, :]))
         dV = state[i, :]-state[i-1, :]
 
         # update refractory period assuming no spikes for now
