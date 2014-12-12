@@ -59,35 +59,6 @@ def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
     return f
               
 
-def taylor1log_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
-    """First order Taylor series approximation of the LIF tuning curve
-    
-    Parameters
-    ----------
-    a: float
-        input value around which to approximate
-    u : array-like of floats
-        input
-    tau : float
-        membrane time constant
-    tref : float
-        refractory period
-    xt : float
-        threshold
-    clip_subxt : boolean (optional)
-        Whether to clip negative values in the approximation to 0
-    """
-    assert a > xt, "a must be > xt"
-    if isinstance(u, (int, float)):  # handle scalars
-        u = np.array([u])
-    k0 = -tau*(np.log(1.-xt/a)+xt/(a-xt))
-    k1 = tau*xt/(a*(a-xt))
-    f = (tref + k0 + k1*u)**-1
-    if clip_subxt:
-        f[f < 0.] = 0.
-    return f
-
-
 def th_lif_if(f, tau, tref, xt):
     """Theoretical inverse of the LIF tuning curve
 
@@ -199,16 +170,16 @@ def sim_lif_fi(dt, u, tau, tref, xt):
     """
     # theory used to set how long to simulate
     th_f = th_lif_fi(u, tau, tref, xt)
-    sim_f = np.zeros(th_af.shape)
+    sim_f = np.zeros(th_f.shape)
     for idx, u_val in enumerate(u):
         if th_f[idx] < .01:
             # estimated firing rate too low. would require too long to simulate
             continue
         T_f = 1./th_f[idx]  # expected interspike interval
         # run long enough to collect some spikes
-        run_time = 5.*T_af
+        run_time = 5.*T_f
         u_in = u_val+np.zeros(int(np.ceil(run_time/dt)))
-        spike_times = run_lifsoma(dt, u_in, tau_m, tref, xt, af, tauf)
+        spike_times = run_lifsoma(dt, u_in, tau, tref, xt)
         isi = np.diff(spike_times[-3:])
         if (isi[-2]-isi[-1])/isi[-2] > .01:
             print('Warning (sim_lif_fi): ' +
