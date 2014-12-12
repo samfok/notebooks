@@ -1,6 +1,7 @@
 # define neuron models
 import numpy as np
 
+
 ###############################################################################
 # theoretical and theoretical approximations of input, firing rate relations ##
 ###############################################################################
@@ -32,7 +33,7 @@ def th_lif_fi(u, tau, tref, xt):
 
 def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
     """First order Taylor series approximation of the LIF tuning curve
-    
+
     Parameters
     ----------
     a: float
@@ -57,7 +58,7 @@ def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
     if clip_subxt:
         f[f < 0.] = 0.
     return f
-              
+
 
 def th_lif_if(f, tau, tref, xt):
     """Theoretical inverse of the LIF tuning curve
@@ -112,7 +113,7 @@ def num_alif_fi(u, tau, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True,
         tol*af
     ref_fdecay : boolean (optional)
         whether the feedback decays during the refractory period. If the
-        feedback decays during the refractory period, af is scaled by 
+        feedback decays during the refractory period, af is scaled by
         exp(-tref/tauf)
     """
     assert af > 0, "inhibitory feedback scaling must be > 0"
@@ -209,7 +210,7 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
         time constant of the feedback synapse
     ref_fdecay : boolean (optional)
         whether the feedback decays during the refractory period. If the
-        feedback decays during the refractory period, af is scaled by 
+        feedback decays during the refractory period, af is scaled by
         exp(-tref/tauf)
     """
     # numerical estimate used to set how long to simulate
@@ -228,7 +229,7 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
         if (isi[-2]-isi[-1])/isi[-2] > .01:
             print('Warning (sim_alif_fi): ' +
                   'Greater than 1% change in isi between last two isi. ' +
-                  'Probably has not reached steady state for u_in=%.2f' % u_val)
+                  'Has not reached steady state for u_in=%.2f' % u_val)
         sim_af[idx] = 1./isi[-1]
     return sim_af
 
@@ -271,7 +272,7 @@ def run_lifsoma(dt, u, tau, tref, xt, ret_state=False, flatten1=True):
     refractory_time = np.zeros(nneurons)
 
     for i in xrange(1, nsteps):
-        # update soma state with prev state and input 
+        # update soma state with prev state and input
         state[i, :] = decay*state[i-1, :] + increment*u[i, :]
         dV = state[i, :]-state[i-1, :]
 
@@ -357,7 +358,7 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
 
     for i in xrange(1, nsteps):
         # update soma state with prev state, input, and feedback
-        state[i, :] = (decay*state[i-1, :] + 
+        state[i, :] = (decay*state[i-1, :] +
                        increment*(u[i, :] - af*fstate[i, :]))
         dV = state[i, :]-state[i-1, :]
 
