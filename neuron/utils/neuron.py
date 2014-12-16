@@ -116,7 +116,7 @@ def num_alif_fi(u, tau, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True,
         feedback decays during the refractory period, af is scaled by
         exp(-tref/tauf)
     """
-    assert af > 0, "inhibitory feedback scaling must be > 0"
+    # assert af > 0, "inhibitory feedback scaling must be > 0"
     if ref_fdecay:
         af *= np.exp(-tref/tauf)
     if isinstance(u, (int, float)):  # handle scalars
@@ -190,8 +190,7 @@ def sim_lif_fi(dt, u, tau, tref, xt):
     return sim_f
 
 
-def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
-                ref_fdecay=True):
+def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True):
     """Find the adaptive LIF tuning curve by simulating the neuron
 
     Parameters
@@ -353,10 +352,13 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
 
     spiketimes = [[] for i in xrange(nneurons)]
     state = np.zeros(u.shape)
-    fstate = np.zeros((u.shape[0]+1, u.shape[1]))  # +1 for end point edge case
+    fstate = np.zeros((u.shape[0], u.shape[1]))  # +1 for end point edge case
     refractory_time = np.zeros(nneurons)
 
     for i in xrange(1, nsteps):
+        # update feedback with prev state
+        fstate[i, :] = fdecay*fstate[i-1, :]
+
         # update soma state with prev state, input, and feedback
         state[i, :] = (decay*state[i-1, :] +
                        increment*(u[i, :] - af*fstate[i, :]))
@@ -373,8 +375,8 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
         spiked = state[i, :] > xt
         spiked_idx = np.nonzero(spiked)[0]
 
-        # update feedback
-        fstate[i+1, :] = fdecay*fstate[i, :] + fincrement*spiked/dt
+        # update feedback with current spikes
+        fstate[i, :] += fincrement*spiked/dt
 
         # linearly approximate time since neuron crossed spike threshold
         overshoot = (state[i, spiked] - xt) / dV[spiked]
@@ -386,7 +388,6 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
         # set spiking neurons' voltages to zero, and ref. time to tref
         state[i, spiked] = 0
         refractory_time[spiked] = tref + interp_spiketime
-    fstate = fstate[:-1, :]
 
     if nneurons == 1 and flatten1:
         spiketimes = np.array(spiketimes[0])
