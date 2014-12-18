@@ -84,12 +84,16 @@ def th_lif_if(f, tau, tref, xt):
 ###############################################################################
 # numerical methods for determining input, firing rate relations ##############
 ###############################################################################
-def num_alif_fi(u, tau, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True,
+def num_alif_fi_mu_apx(u, tau, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True,
                 max_iter=100, rel_tol=1e-3, verbose=False):
-    """Numerically determine the adaptive LIF neuron tuning curve
+    """Numerically determine the approximate adaptive LIF neuron tuning curve
 
-    Uses binary search to find the steady state firing rate of an adaptive LIF
-    neuron.
+    The solution is approximate because this function assumes that the
+    steady state feedback value is fixed at its mean (hence the _mu_apx postfix
+    in the function name for mu approximation).
+
+    Uses the bisection method (binary search in CS parlance) to find the
+    steady state firing rate
 
     Parameters
     ----------
@@ -213,7 +217,7 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2, ref_fdecay=True):
         exp(-tref/tauf)
     """
     # numerical estimate used to set how long to simulate
-    num_af = num_alif_fi(u, taum, tref, xt, af, tauf, ref_fdecay)
+    num_af = num_alif_fi_mu_apx(u, taum, tref, xt, af, tauf, ref_fdecay)
     sim_af = np.zeros(num_af.shape)
     for idx, u_val in enumerate(u):
         if num_af[idx] < .01:
