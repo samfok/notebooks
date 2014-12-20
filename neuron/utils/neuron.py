@@ -258,33 +258,34 @@ def num_alif_fi_mu_apx(u, tau, tref, xt, af=1e-3, tauf=1e-2,
         maximium number of iterations in binary search
     rel_tol : float (optional)
         relative tolerance of binary search algorithm. The algorithm terminates
-        when maximum difference between estimated af and input af is within
-        tol*af
+        when maximum, relative difference between estimated u and input u is
+        within rel_tol
     """
     assert af > 0, "inhibitory feedback scaling must be > 0"
     af *= np.exp(-tref/tauf)
+    # af *= np.exp(-tref/tauf)
     if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
 
     f_high = th_lif_fi(u, tau, tref, xt)
-    f_ret = np.zeros(f_high.shape)
+    f_ret = np.zeros(u.shape)
     idx = f_high > 0.
     f_high = f_high[idx]
     f_low = np.zeros(f_high.shape)
-    tol = abs(af)*rel_tol  # set tolerance relative to af
     exit_msg = 'reached max iterations'
+    # import pdb; pdb.set_trace()
     for i in xrange(max_iter):
         f = (f_high+f_low)/2.
         u_net = th_lif_if(f, tau, tref, xt)
-        u_f = u[idx] - u_net
-        a = u_f/f
-        high_idx = a > af
-        low_idx = a <= af
-        f_high[low_idx] = f[low_idx]
-        f_low[high_idx] = f[high_idx]
+        uf = f*af
+        uhat = u_net + uf
+        high_idx = uhat > u[idx]
+        low_idx = uhat <= u[idx]
+        f_high[high_idx] = f[high_idx]
+        f_low[low_idx] = f[low_idx]
 
-        max_diff = np.max(np.abs(a-af))
-        if max_diff < tol:
+        max_rel_diff = np.max(np.abs(uhat-u[idx])/u[idx])
+        if max_rel_diff < rel_tol:
             exit_msg = 'reached tolerance'
             break
     f_ret[idx] = f
