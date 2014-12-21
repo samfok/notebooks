@@ -1,7 +1,67 @@
 import numpy as np
 from matplotlib.pyplot import figure
 from neuron import (
-    th_lif_fi, th_lif_if, num_alif_fi, num_alif_fi_mu_apx)
+    th_lif_fi, th_lif_if, num_alif_fi, num_alif_fi_mu_apx, sim_alif_fi)
+
+
+def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf):
+    n = len(tauf)
+    fig = figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
+
+    th_max_f = 1./tref
+    max_u = 5.
+    u = np.array(np.sort(np.linspace(0, max_u, 100).tolist() +
+                         [xt, 1.001*xt, 1.01*xt, 1.1*xt]))
+    lif_fi = th_lif_fi(u, taum, tref, xt)
+    max_f = max(lif_fi)
+    f = np.linspace(5., max_f, 10)
+    _u = th_lif_if(f, taum, tref, xt)  # linear in firing rate
+
+    ax.plot(u, lif_fi, 'k', lw=2, label='nonadaptive LIF')
+    for idx, tauf_val in enumerate(tauf):
+        sim_af = sim_alif_fi(dt, _u, taum, tref, xt, af, tauf_val)
+        num_af = num_alif_fi(u, taum, tref, xt, af, tauf_val, max_f=max_f)
+        ax.plot(_u, sim_af, 'o', mfc=cc[idx], ms=8, alpha=.5)
+        ax.plot(u, num_af, c=cc[idx], lw=2,
+                label=r'$\tau_f=%.3f$' % (tauf_val))
+    ax.set_ylim(0, th_max_f)
+    ax.set_xlim(0, max_u*1.001)
+    ax.legend(loc='upper left')
+    ax.set_xlabel(r'$u_{in}$', fontsize=20)
+    ax.set_ylabel(r'$f$ (spks / s)', fontsize=20)
+    ax.set_title(r'$\tau=%.3f$, $\alpha_f=%.2f$' % (taum, af), fontsize=20)
+
+
+def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf):
+    n = len(af)
+    fig = figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
+
+    th_max_f = 1./tref
+    max_u = 5.
+    u = np.array(np.sort(np.linspace(0, max_u, 100).tolist() +
+                         [xt, 1.001*xt, 1.01*xt, 1.1*xt]))
+    lif_fi = th_lif_fi(u, taum, tref, xt)
+    max_f = max(lif_fi)
+    f = np.linspace(5., max_f, 10)
+    _u = th_lif_if(f, taum, tref, xt)  # linear in firing rate
+
+    ax.plot(u, lif_fi, 'k', lw=2, label='nonadaptive LIF')
+    for idx, af_val in enumerate(af):
+        sim_af = sim_alif_fi(dt, _u, taum, tref, xt, af_val, tauf)
+        num_af = num_alif_fi(u, taum, tref, xt, af_val, tauf, max_f=max_f)
+        ax.plot(u, num_af, c=cc[idx], lw=2,
+                label=r'$\alpha_f=%.3f$' % (af_val))
+        ax.plot(_u, sim_af, 'o', mfc=cc[idx], ms=8, alpha=.5)
+    ax.set_ylim(0, th_max_f)
+    ax.set_xlim(0, max_u*1.001)
+    ax.legend(loc='upper left')
+    ax.set_xlabel(r'$u_{in}$', fontsize=20)
+    ax.set_ylabel(r'$f$ (spks / s)', fontsize=20)
+    ax.set_title(r'$\tau=%.3f$, $\tau_f=%.2f$' % (taum, tauf), fontsize=20)
 
 
 def taylor1_lif_k0_k1(a, tau, tref, xt):
