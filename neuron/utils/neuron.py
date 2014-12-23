@@ -133,6 +133,8 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
         when maximum difference between estimated u and input u is within
         tol
     """
+    if isinstance(u, (int, float)):  # handle scalars
+        u = np.array([u])
     f_ret = np.zeros(u.shape)
     f_high = max_f
     if max_f is None:
@@ -387,8 +389,8 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
     else:
         workers = Pool(max_proc)
         sim_af = workers.map(_sim_alif_fi_worker, args)
-        # workers.close()
-        # workers.join()
+        workers.close()
+        workers.join()
     return np.array(sim_af)
 
 
