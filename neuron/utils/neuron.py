@@ -1,6 +1,7 @@
 # define neuron models
 import numpy as np
 from scipy.optimize import bisect
+from multiprocessing import Pool, cpu_count
 
 
 ###############################################################################
@@ -332,7 +333,34 @@ def sim_lif_fi(dt, u, tau, tref, xt):
     return sim_f
 
 
-def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2):
+def _sim_alif_fi_worker(args):
+    return _sim_alif_fi_worker_unwrapped(*args)
+
+
+def _sim_alif_fi_worker_unwrapped(dt, u, taum, tref, xt, af, tauf):
+    num_af = num_alif_fi(u, taum, tref, xt, af, tauf)
+    if num_af < .01:
+        # estimated firing rate too low. would require too long to simulate
+        return 0.
+    T_af = 1./num_af  # expected interspike interval
+    # run long enough to reach steady state and collect some spikes
+    run_time = 5.*tauf+5.*T_af
+    u_in = u+np.zeros(int(np.ceil(run_time/dt)))
+    spike_times = run_alifsoma(dt, u_in, taum, tref, xt, af, tauf)
+    isi = np.diff(spike_times[-3:])
+    assert ((isi[-2]-isi[-1])/isi[-2] < .01), (
+        'sim_alif_fi: Greater than 1% change in isi between last two isi. ' +
+        'Has not reached steady state for u_in=%.2f' % u)
+    return 1./isi[-1]
+
+
+def _sim_alif_fi_wrap_args(dt, u, taum, tref, xt, af, tauf):
+    args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
+    return args
+
+
+def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
+                max_proc=cpu_count()-1):
     """Find the adaptive LIF tuning curve by simulating the neuron
 
     Parameters
@@ -349,26 +377,19 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2):
         scales the inhibitory feedback
     tauf : float (optional)
         time constant of the feedback synapse
+    max_proc : int (optional)
+        max number of cores to use
     """
-    # numerical estimate used to set how long to simulate
-    num_af = num_alif_fi_mu_apx(u, taum, tref, xt, af, tauf)
-    sim_af = np.zeros(num_af.shape)
-    for idx, u_val in enumerate(u):
-        if num_af[idx] < .01:
-            # estimated firing rate too low. would require too long to simulate
-            continue
-        T_af = 1./num_af[idx]  # expected interspike interval
-        # run long enough to reach steady state and collect some spikes
-        run_time = 5.*tauf+5.*T_af
-        u_in = u_val+np.zeros(int(np.ceil(run_time/dt)))
-        spike_times = run_alifsoma(dt, u_in, taum, tref, xt, af, tauf)
-        isi = np.diff(spike_times[-3:])
-        if (isi[-2]-isi[-1])/isi[-2] > .01:
-            print('Warning (sim_alif_fi): ' +
-                  'Greater than 1% change in isi between last two isi. ' +
-                  'Has not reached steady state for u_in=%.2f' % u_val)
-        sim_af[idx] = 1./isi[-1]
-    return sim_af
+    args = _sim_alif_fi_wrap_args(dt, u, taum, tref, xt, af, tauf)
+
+    if (max_proc in (0, None)) or (len(u) == 1):
+        sim_af = map(_sim_alif_fi_worker, args)
+    else:
+        workers = Pool(max_proc)
+        sim_af = workers.map(_sim_alif_fi_worker, args)
+        # workers.close()
+        # workers.join()
+    return np.array(sim_af)
 
 
 ###############################################################################

@@ -4,10 +4,11 @@ from neuron import (
     th_lif_fi, th_lif_if, num_alif_fi, num_alif_fi_mu_apx, sim_alif_fi)
 
 
-def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf):
+def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     n = len(tauf)
-    fig = figure(figsize=(8, 6))
-    ax = fig.add_subplot(111)
+    if ax is None:
+        fig = figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
     cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
 
     th_max_f = 1./tref
@@ -31,13 +32,14 @@ def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf):
     ax.legend(loc='upper left')
     ax.set_xlabel(r'$u_{in}$', fontsize=20)
     ax.set_ylabel(r'$f$ (spks / s)', fontsize=20)
-    ax.set_title(r'$\tau=%.3f$, $\alpha_f=%.2f$' % (taum, af), fontsize=20)
+    ax.set_title(r'$\tau=%.3f$, $\alpha_f=%.3f$' % (taum, af), fontsize=20)
 
 
-def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf):
+def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     n = len(af)
-    fig = figure(figsize=(8, 6))
-    ax = fig.add_subplot(111)
+    if ax is None:
+        fig = figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
     cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
 
     th_max_f = 1./tref
@@ -61,7 +63,7 @@ def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf):
     ax.legend(loc='upper left')
     ax.set_xlabel(r'$u_{in}$', fontsize=20)
     ax.set_ylabel(r'$f$ (spks / s)', fontsize=20)
-    ax.set_title(r'$\tau=%.3f$, $\tau_f=%.2f$' % (taum, tauf), fontsize=20)
+    ax.set_title(r'$\tau=%.3f$, $\tau_f=%.3f$' % (taum, tauf), fontsize=20)
 
 
 def taylor1_lif_k0_k1(a, tau, tref, xt):
