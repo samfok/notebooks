@@ -356,11 +356,6 @@ def _sim_alif_fi_worker_unwrapped(dt, u, taum, tref, xt, af, tauf):
     return 1./isi[-1]
 
 
-def _sim_alif_fi_wrap_args(dt, u, taum, tref, xt, af, tauf):
-    args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
-    return args
-
-
 def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
                 max_proc=cpu_count()-1):
     """Find the adaptive LIF tuning curve by simulating the neuron
@@ -382,7 +377,7 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
     max_proc : int (optional)
         max number of cores to use
     """
-    args = _sim_alif_fi_wrap_args(dt, u, taum, tref, xt, af, tauf)
+    args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
 
     if (max_proc in (0, None)) or (len(u) == 1):
         sim_af = map(_sim_alif_fi_worker, args)

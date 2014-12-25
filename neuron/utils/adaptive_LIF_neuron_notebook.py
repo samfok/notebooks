@@ -1,7 +1,10 @@
 import numpy as np
 from matplotlib.pyplot import figure
+from multiprocessing import Pool, cpu_count
 from neuron import (
-    th_lif_fi, th_lif_if, num_alif_fi, num_alif_fi_mu_apx, sim_alif_fi)
+    th_lif_fi, th_lif_if, num_alif_fi, num_alif_fi_mu_apx, sim_alif_fi,
+    run_alifsoma)
+from signal import filter_spikes
 
 
 def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
@@ -64,6 +67,72 @@ def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     ax.set_xlabel(r'$u_{in}$', fontsize=20)
     ax.set_ylabel(r'$f$ (spks / s)', fontsize=20)
     ax.set_title(r'$\tau=%.3f$, $\tau_f=%.3f$' % (taum, tauf), fontsize=20)
+
+
+def _af_tauf_sweep_worker(args):
+    return _af_tauf_sweep_worker_unwrapped(*args)
+
+
+def _af_tauf_sweep_worker_unwrapped(dt, uin, taum, tref, xt, af, tauf, tausyn):
+    if tausyn is None:
+        tausyn = tauf
+    T = max([4.*tauf, 4.*tausyn,
+             2.0/num_alif_fi(uin, taum, tref, xt, af, tauf)])
+    nsteps = int(np.ceil(T/dt))
+    t = np.arange(nsteps)*dt
+    u = np.zeros(nsteps)+uin
+    f_init = th_lif_fi(uin, taum, 0., xt)
+    isi_init = 1./f_init
+    f_ss = num_alif_fi(uin, taum, tref, xt, af, tauf)
+    isi_ss = 1./f_ss
+    n_ss_spks = int(np.ceil(T/isi_ss))
+    f_ss_spk_times = isi_ss*np.arange(n_ss_spks)+isi_init
+    x_syn = filter_spikes(dt, T, f_ss_spk_times, tausyn, ret_time=False)
+    e_x_syn = np.zeros(t.shape)
+    idx = t > isi_init
+    e_x_syn[idx] = f_ss*(1-np.exp(-(t[idx]-isi_init)/tausyn))
+    alif_spk_times = run_alifsoma(dt, u, taum, tref, xt, af=af, tauf=tauf)
+    ax_syn = filter_spikes(dt, T, alif_spk_times, tausyn, ret_time=False)
+    ret = dict(t=t, T=T, af=af, tauf=tauf, tausyn=tausyn, f_ss=f_ss,
+               ax_syn=ax_syn, x_syn=x_syn, e_x_syn=e_x_syn)
+    return ret
+
+
+def af_tauf_sweep(dt, uin, taum, tref, xt, afs, taufs, tausyn=None,
+                  max_proc=cpu_count()-1, suptitle=None):
+    n_af = len(afs)
+    n_tauf = len(taufs)
+    params = [(dt, uin, taum, tref, xt, af, tauf, tausyn)
+              for tauf in taufs for af in afs]
+
+    fig = figure(figsize=(16, 12))
+    axs = [fig.add_subplot(n_tauf, n_af, i+1) for i in xrange(n_af*n_tauf)]
+    if (max_proc in (None, 0, 1)) or (len(params) == 1):
+        results = map(_af_tauf_sweep_worker, params)
+    else:
+        workers = Pool(max_proc)
+        results = workers.map(_af_tauf_sweep_worker, params)
+        workers.close()
+        workers.join()
+
+    for idx, r in enumerate(results):
+            ax = axs[idx]
+            ax.plot(r['t']/r['tausyn'], r['ax_syn']/r['f_ss'], 'b',
+                    label='adaptive')
+            ax.plot(r['t']/r['tausyn'], r['x_syn']/r['f_ss'], 'r', alpha=.3,
+                    label='nonadaptive')
+            ax.plot(r['t']/r['tausyn'], r['e_x_syn']/r['f_ss'], 'r:', alpha=.7,
+                    label='E[nonadaptive]')
+            ax.axhline(1., c='k', ls=':')
+            ax.set_xlim(0, r['T']/r['tausyn'])
+            ax.set_title(r'$\alpha_f,\tau_f=%.3f,\ %.3f$' %
+                         (r['af'], r['tauf']), fontsize=14)
+    axs[12].legend(loc='lower right')
+    fig.text(.48, .08, r'$t (\tau_{syn})$', fontsize=20)
+    fig.text(.08, .52, r'$x_{syn}/\lambda_{ss}$', fontsize=20,
+             rotation='vertical')
+    if suptitle is not None:
+        fig.text(.48, .93, suptitle, fontsize=20)
 
 
 def taylor1_lif_k0_k1(a, tau, tref, xt):
