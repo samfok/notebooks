@@ -2,12 +2,13 @@
 import numpy as np
 import multiprocessing
 from signal import make_poisson_spikes, filter_spikes
-from neuron import th_lif_fi, run_lifsoma
+from neuron import th_lif_fi, run_lifsoma, th_usyn_xmin, th_usyn_xmax
 from plot import (
     plot_continuous, plot_spike_raster, plot_histogram,
     plot_contour, plot_scatter, match_xlims, save_close_fig)
 from scipy.special import erf
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
 
 
 def normal_cdf(x, mu=0., sigma=1.):
@@ -16,8 +17,6 @@ def normal_cdf(x, mu=0., sigma=1.):
 
 # Gaussian 1 sigma percentiles
 s1_percentiles = [normal_cdf(-1.)*100., normal_cdf(1.)*100.]
-
-
 rng = None
 FIGDIR = None
 
@@ -41,7 +40,7 @@ def _call_compute_stats(fexc_finh):
 class LIF_IO_Collector(object):
     """Collects output stats from an LIF neuron given Poisson spike input"""
     def __init__(self, dt, T, alpha, neuronp, filt_tau, k_trans,
-                 dev_pcts=s1_percentiles):
+                 dev_pcts=s1_percentiles, spike_fun=make_poisson_spikes):
         self.dt = dt
         self.T = T
         self.alpha = alpha
@@ -50,6 +49,7 @@ class LIF_IO_Collector(object):
         self.k_trans = k_trans
         self.nsteps = int(np.ceil(T/dt))
         self.dev_pcts = dev_pcts
+        self.spike_fun = spike_fun
 
     def _compute_stats(self, fexc_finh):
         fexc = fexc_finh[0]
@@ -57,8 +57,8 @@ class LIF_IO_Collector(object):
 
         fexc_nspikes = 2.*self.T*fexc
         finh_nspikes = 2.*self.T*finh
-        fexc_spks_in = make_poisson_spikes(fexc, fexc_nspikes, rng)
-        finh_spks_in = make_poisson_spikes(finh, finh_nspikes, rng)
+        fexc_spks_in = self.spike_fun(fexc, fexc_nspikes, rng)
+        finh_spks_in = self.spike_fun(finh, finh_nspikes, rng)
         t, fexc_in = filter_spikes(self.dt, self.T, fexc_spks_in,
                                    self.neuronp['tau_syn'])
         t, finh_in = filter_spikes(self.dt, self.T, finh_spks_in,
@@ -124,9 +124,70 @@ class LIF_IO_Collector(object):
         return retval
 
 
+# define a function for finding the tuning curve under noisy input
+def noisy_tuning(dt, T, max_u, max_f, k_trans, nsamples, max_proc,
+                 taum, tref, xt, tausyn, taufilt, spikefun, fname):
+    T += k_trans*tausyn
+    T_ss = T - k_trans*tausyn
+
+    u_th = np.sort(np.linspace(0, max_u, 100).tolist() + [xt, 1.01*xt])
+    fi = th_lif_fi(u_th, taum, tref, xt)
+    fig, ax = plot_continuous(
+        u_th, fi, plotp={'color': 'b', 'linewidth': 2, 'label': '$a(E[u])$'},
+        figp={'figsize': (8, 6)},
+        xlabelp={'xlabel': r'$u$', 'fontsize': 20},
+        ylabelp={'ylabel': r'$a(u)$', 'fontsize': 20})
+    fig.subplots_adjust(hspace=1.)
+    u = np.linspace(0, max_u, nsamples)
+    alpha = max_u/max_f
+    f = u/alpha
+
+    neuronp = dict(tau_syn=tausyn, tau_m=taum, tref=tref, xt=xt)
+    io_collector = LIF_IO_Collector(
+        dt, T, alpha, neuronp, filt_tau=taufilt, k_trans=k_trans,
+        dev_pcts=[5, 95])
+    tuning, dev_l, dev_u = io_collector.collect_io_stats(
+        fexc=f, finh=None, ret_devs=True, max_proc=max_proc)
+
+    xmin_th = th_usyn_xmin(tuning, taufilt)
+    xmax_th = th_usyn_xmax(tuning, taufilt)
+    xmin_dev_th = (tuning-xmin_th).reshape((1, -1))
+    xmax_dev_th = (xmax_th-tuning).reshape((1, -1))
+    xmin_xmax_dev_th = np.vstack((xmin_dev_th, xmax_dev_th))
+
+    yerr = np.vstack((dev_l.reshape((1, -1)), dev_u.reshape((1, -1))))
+    ax.plot(u, tuning, 'r-o', label=r'$E[a(u)]$')
+    ax.errorbar(u, tuning, yerr=yerr, fmt='r')
+    eb = ax.errorbar(u, tuning, yerr=xmin_xmax_dev_th, fmt='none', ecolor='k')
+    eb[-1][0].set_linestyle(':')
+    eb[-1][0].set_label('min/max for uniform spikes')
+    ax.legend(loc='upper left')
+    nsteps_ss = int(np.ceil(T_ss/dt))
+    ax.set_title(
+        r'$%d$ samples over $%d\tau_{syn}$ , ' %
+        (nsteps_ss, int(np.round(T_ss/tausyn))) +
+        r'$f_{max}\tau_{syn}=%.1f$' % (max_f*tausyn),
+        fontsize=20, y=1.03)
+    ax.set_xlabel(r'$E[u]$', fontsize=20)
+    ax.set_ylabel('spikes per second', fontsize=20)
+    fig.savefig(FIGDIR+fname+'_syn.png', dpi=200)
+
+    fig = figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    eb = ax.errorbar(
+        u, np.zeros(u.shape), yerr=xmin_xmax_dev_th, fmt='none', ecolor='k')
+    eb[-1][0].set_linestyle(':')
+    eb[-1][0].set_label('min/max for uniform spikes')
+    ax.errorbar(u, np.zeros(u.shape), yerr=yerr, fmt='ro')
+    ax.legend(loc='upper right')
+    ax.set_title("$5/95\%$ errorbars", fontsize=20)
+    ax.set_ylabel(r'$a(u)-E[a(u)]$' + '\n(spikes per second)', fontsize=20)
+    ax.set_xlabel(r'$E[u]$', fontsize=20)
+    fig.savefig(FIGDIR+fname+'_syn_noise.png', dpi=200)
+
+
 # define a function for sweeping the input space of
 # an LIF neuron and measuring its output statistics
-
 def fexc_finh_sweep(neuronp, filt_tau=.01, k_trans=5, max_u=6., max_f=1000.,
                     npts=10, fname_pre='', max_proc=None, close=False):
     alpha = max_u/max_f

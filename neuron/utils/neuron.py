@@ -83,6 +83,22 @@ def th_lif_if(f, tau, tref, xt):
     return u
 
 
+def th_usyn_xmin(lam, tau):
+    """Theoretical steady state xmin for synapse with uniform input"""
+    ret = np.zeros(len(lam))
+    idx = lam > 0
+    ret[idx] = np.exp(-1./(lam[idx]*tau))/(tau*(1.-np.exp(-1./(lam[idx]*tau))))
+    return ret
+
+
+def th_usyn_xmax(lam, tau):
+    """Theoretical steady state xmax for synapse with uniform input"""    
+    ret = np.zeros(len(lam))
+    idx = lam > 0
+    ret[idx] = 1./(tau*(1.-np.exp(-1./(lam[idx]*tau))))
+    return ret
+
+
 ###############################################################################
 # numerical methods for determining input, firing rate relations ##############
 ###############################################################################

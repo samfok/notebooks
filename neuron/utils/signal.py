@@ -21,6 +21,25 @@ def make_poisson_spikes(rate, nspikes, rng=np.random):
     return spike_times
 
 
+def make_uniform_spikes(rate, nspikes, rng=np.random):
+    """Creates spikes with Poisson statistics
+
+    Parameters
+    ----------
+    rate : float
+    nspikes : int
+    rng : numpy random number generator
+        used to set the offset of the first spike
+    """
+    if rate == 0:
+        return np.array([])
+    isi = 1./rate
+    offset = isi*rng.uniform()
+    spike_times = isi*(np.arange(nspikes)+offset)
+    if isinstance(spike_times, (float, int)):
+        spike_times = np.array([spike_times])
+    return spike_times
+
 def filter_spikes(dt, duration, spike_times, tau, ret_time=True):
     """Filters spikes with a synapse (first order low-pass filter)
     
