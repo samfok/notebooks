@@ -1,0 +1,44 @@
+% \documentclass{standalone}
+\documentclass[convert={density=300,size=500x400,outext=.png}]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate, node distance=3em]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=1.5cm, >=latex']
+\node [input] (input) {};
+\node [multiply, right of=input] (B) {$B'$};
+\node [point, right of=B] (sum) {};
+\node [point, right of=sum, node distance=.5cm] (sum split) {};
+\node [block, right of=sum split] (sys2) {$h_2(t)$};
+\node [block, above of=sys2] (sys1) {$h_1(t)$};
+\node [below of=sys2, node distance=1cm] (sysetc) {$\vdots$};
+\node [block, below of=sysetc, node distance=1cm] (sysk) {$h_k(t)$};
+\node [multiply, right of=sys1] (dsys1) {$d_1$};
+\node [multiply, right of=sys2] (dsys2) {$d_2$};
+\node [multiply, right of=sysk] (dsysk) {$d_k$};
+\node [point, right of=dsys2] (sys merge) {};
+\node [point, right of=sys merge, node distance=.5cm] (output split) {};
+\node [output, right of=output split] (output) {};
+\node [multiply, below of=sysk] (A) {$A'$};
+\draw [->] (input) -- node {$u(t)$} (B);
+\draw (B) -- (sum);
+\draw (sum) -- (sum split);
+\draw [->] (sum split) -- (sys1);
+\draw [->] (sum split) -- (sys2);
+\draw [->] (sum split) -- (sysk.north west);
+\draw [->] (sys1) -- (dsys1);
+\draw [->] (sys2) -- (dsys2);
+\draw [->] (sysk) -- (dsysk);
+\draw [->] (dsys1) -- (sys merge);
+\draw [->] (dsys2) -- node {$x(t)$} (output);
+\draw [->] (dsysk) -- (sys merge);
+\draw [->] (output split) |- (A);
+\draw [->] (A) -| (sum);
+\end{tikzpicture} 
+\end{document}
