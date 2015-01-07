@@ -1,0 +1,31 @@
+\documentclass[convert={density=300,size=500x400,outext=.png}]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=2cm, >=latex']
+  \matrix[row sep=2em, column sep=3em] {
+    % first row
+    \node [input] (input) {}; & 
+    \node [multiply] (B) {$B$}; & 
+    \node [point] (sum) {} ; & 
+    \node [block] (sys) {$\int$}; & 
+    \node [point] (output split) {}; & 
+    \node [output] (output) {}; \\
+    % second row 
+    & & & \node [multiply] (A) {$A$}; & & \\
+  };
+  \draw [->] (input) -- node {$u(t)$} (B);
+  \draw (B) -- (sum);
+  \draw [->] (sum) -- node {$\dot{x}(t)$} (sys);
+  \draw [->] (sys) -- node {$x(t)$} (output);
+  \draw [->] (output split) |- (A);
+  \draw [->] (A) -| (sum);
+\end{tikzpicture} 
+\end{document}
