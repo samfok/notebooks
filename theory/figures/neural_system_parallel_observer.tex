@@ -1,4 +1,4 @@
-\documentclass[convert={density=300,size=500x400,outext=.png}]{standalone}
+\documentclass[convert={density=300,size=600x400,outext=.png}]{standalone}
 % \documentclass{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes, arrows}
@@ -13,19 +13,22 @@
 \begin{tikzpicture}[auto, node distance=2cm, >=latex']
   \matrix[row sep=2em, column sep=3em] {
     % first row
+    & & & \node [block] (obs) {$h_{obs}(t)$}; & \node [output] (output) {}; \\
+    % second row 
     \node [input] (input) {}; & 
     \node [multiply] (B) {$B'$}; & 
     \node [point] (sum) {} ; & 
-    \node [block] (sys) {$h(t)$}; & 
-    \node [point] (output split) {}; & 
-    \node [output] (output) {}; \\
-    % second row 
-    & & & \node [multiply] (A) {$A'$}; & & \\
+    \node [block] (sys) {$h_{syn}(t)$}; & 
+    \node [point] (output split) {};  \\
+    % third row
+    & & & \node [multiply] (A) {$A'$}; & \\
   };
   \draw [->] (input) -- node {$u(t)$} (B);
   \draw (B) -- (sum);
-  \draw [->] (sum) -- (sys);
-  \draw [->] (sys) -- node {$x(t)$} (output);
+  \draw [->] (sum) |- node {$e(t)$} (obs);
+  \draw [->] (sum) -- node {$e(t)$} (sys);
+  \draw (sys) -- node {$x(t)$} (output split);
+  \draw [->] (obs) -- node {$y(t)$} (output);
   \draw [->] (output split) |- (A);
   \draw [->] (A) -| (sum);
 \end{tikzpicture} 

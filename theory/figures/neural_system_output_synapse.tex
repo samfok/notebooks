@@ -1,4 +1,4 @@
-\documentclass[convert={density=300,size=500x400,outext=.png}]{standalone}
+\documentclass[convert={density=300,size=600x400,outext=.png}]{standalone}
 % \documentclass{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes, arrows}
@@ -16,16 +16,18 @@
     \node [input] (input) {}; & 
     \node [multiply] (B) {$B'$}; & 
     \node [point] (sum) {} ; & 
-    \node [block] (sys) {$h(t)$}; & 
-    \node [point] (output split) {}; & 
+    \node [block] (sys) {$h_{syn}(t)$}; & 
+    \node [point] (output split) {}; &
+    \node [block] (obs) {$h_{obs}(t)$}; &
     \node [output] (output) {}; \\
     % second row 
-    & & & \node [multiply] (A) {$A'$}; & & \\
+    & & & \node [multiply] (A) {$A'$}; & & & \\
   };
   \draw [->] (input) -- node {$u(t)$} (B);
   \draw (B) -- (sum);
   \draw [->] (sum) -- (sys);
-  \draw [->] (sys) -- node {$x(t)$} (output);
+  \draw [->] (sys) -- node {$x(t)$} (obs);
+  \draw [->] (obs) -- node {$y(t)$} (output);
   \draw [->] (output split) |- (A);
   \draw [->] (A) -| (sum);
 \end{tikzpicture} 
