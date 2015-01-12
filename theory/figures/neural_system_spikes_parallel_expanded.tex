@@ -1,0 +1,37 @@
+\documentclass[convert={density=300,size=800x600,outext=.png}]{standalone}
+% \documentclass{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=2cm, >=latex']
+  \matrix[row sep=2em, column sep=3.5em] {
+    % first row
+    & & & \node [block] (sys2) {$h(t)$}; & \node [block] (neurons2) {target}; \\
+    % first row
+    \node [input] (input) {}; & 
+    \node [multiply] (B) {$B'$}; & 
+    \node [point] (sum) {} ; & 
+    \node [block] (sys) {$h(t)$}; & 
+    \node [block] (neurons) {soma}; &
+    \node [point] (output split) {}; \\
+    % second row 
+    & & & & \node [multiply] (A) {$A'$}; & & & \\
+  };
+  \draw [->] (input) -- node [text width=1cm] {$u(t)$ spikes} (B);
+  \draw (B) -- node {spikes} (sum);
+  \draw [->] (sum) -- (sys);
+  \draw [->] (sys) -- node {current} (neurons);
+  \draw (neurons) -- (output split);
+  \draw [->] (sum) |- (sys2);
+  \draw [->] (sys2) -- node {current} (neurons2);
+  \draw [->] (output split) |- node [text width=1.2cm] {$x(t)$ spikes} (A);
+  \draw [->] (A) -| (sum);
+\end{tikzpicture} 
+\end{document}
