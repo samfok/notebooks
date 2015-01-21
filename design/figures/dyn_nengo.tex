@@ -13,23 +13,21 @@
 \begin{tikzpicture}[auto, node distance=2cm, >=latex']
   \matrix[row sep=2em, column sep=3.5em] {
     % first row
-    \node [block] (input) {node}; & 
+    \node [block] (input) {Node}; & 
     \node [multiply] (B) {$B'$}; & 
     \node [point] (sum) {} ; & 
-    \node [block] (neurons) {ens}; &
+    \node [block] (neurons) {Ens}; &
     \node [block] (sys) {$h(t)$}; & 
     \node [point] (output split) {}; & 
-    \node [block] (neurons2) {target}; &
-    \node [output] (output) {}; \\
+    \node [block] (probe) {Probe}; \\
     % second row 
     & & & & \node [multiply] (A) {$A'$}; & & & \\
   };
-  \draw [->] (input) -- node [text width=1cm] {$u(t)$ ss value} (B);
-  \draw (B) -- node {ss value} (neurons);
+  \draw [->] (input) -- node {$u(t)$} (B);
+  \draw (B) -- (neurons);
   \draw [->] (sum) -- (neurons);
   \draw [->] (neurons) -- node [text width=1cm] {decoded spikes} (sys);
-  \draw [->] (sys) -- node [text width=1.2cm] {$x(t)$ ss value} (neurons2);
-  \draw [->] (neurons2) -- (output);
+  \draw [->] (sys) -- node [text width=1cm] {$x(t)$} (probe);
   \draw [->] (output split) |- (A);
   \draw [->] (A) -| (sum);
 \end{tikzpicture} 

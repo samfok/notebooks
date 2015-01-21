@@ -1,0 +1,27 @@
+\documentclass[convert={density=300,size=680x200,outext=.png}]{standalone}
+% \documentclass{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=2cm, >=latex']
+  \matrix[row sep=2em, column sep=3.5em] {
+    % first row
+    \node [block] (input) {Node}; & 
+    \node [block] (syn1) {$h(t)$}; & 
+    \node [block] (neurons) {Ens}; &
+    \node [block] (syn2) {$h(t)$}; & 
+    \node [block] (probe) {Probe}; \\
+  };
+  \draw [->] (input) -- node {$u(t)$} (syn1);
+  \draw [->] (syn1) -- (neurons);
+  \draw [->] (neurons) -- node [text width=1cm] {decoded spikes} (syn2);
+  \draw [->] (syn2) -- node {$x(t)$} (probe);
+\end{tikzpicture} 
+\end{document}
