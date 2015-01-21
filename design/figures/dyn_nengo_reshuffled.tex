@@ -1,4 +1,4 @@
-\documentclass[convert={density=300,size=800x300,outext=.png}]{standalone}
+\documentclass[convert={density=300,size=1000x300,outext=.png}]{standalone}
 % \documentclass{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes, arrows}
@@ -18,16 +18,18 @@
     \node [point] (sum) {} ; & 
     \node [block] (neurons) {Ens}; &
     \node [block] (syn) {$h(t)$}; & 
-    \node [point] (output split) {}; & 
+    \node [point] (output split) {}; &
+    \node [multiply] (C) {$C$}; &
     \node [block] (probe) {Probe}; \\
     % second row 
-    & & & & \node [multiply] (A) {$A'$}; & & & \\
+    & & & & \node [multiply] (A) {$A'$}; & & & & \\
   };
   \draw [->] (input) -- node {$u(t)$} (B);
   \draw (B) -- (neurons);
   \draw [->] (sum) -- (neurons);
   \draw [->] (neurons) -- node [text width=1cm] {decoded spikes} (syn);
-  \draw [->] (syn) -- node {$x(t)$} (probe);
+  \draw [->] (syn) -- node {$x(t)$} (C);
+  \draw [->] (C) -- node {$y(t)$} (probe);
   \draw [->] (output split) |- (A);
   \draw [->] (A) -| (sum);
 \end{tikzpicture} 
