@@ -1,4 +1,4 @@
-\documentclass[convert={density=300,size=1000x300,outext=.png}]{standalone}
+\documentclass[convert={density=300,size=800x300,outext=.png}]{standalone}
 % \documentclass{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes, arrows}
@@ -12,25 +12,25 @@
 \tikzstyle{output} = [coordinate]
 \begin{tikzpicture}[auto, node distance=2cm, >=latex']
   \matrix[row sep=2em, column sep=3.5em] {
-    % first row
+    & & & & \node [block] (probe syn) {$h(t)$}; & \node [block] (probe) {Probe}; & & \\    
     \node [block] (input) {Node}; & 
-    \node [block] (in syn) {$h(t)$}; &
+    \node [block] (spk ens) {Ens}; &
     \node [multiply] (B) {$B'$}; & 
     \node [point] (sum) {} ; & 
+    \node [block] (syn) {$h(t)$}; & 
     \node [block] (neurons) {Ens}; &
-    \node [block] (sys) {$h(t)$}; & 
-    \node [point] (output split) {}; & 
-    \node [block] (probe) {Probe}; \\
-    % second row 
-    & & & & & \node [multiply] (A) {$A'$}; & & & \\
+    \node [point] (output split) {}; \\ 
+    & & & & \node [multiply] (A) {$A'$}; & & & \\
   };
-  \draw [->] (input) -- node {$u(t)$} (in syn);
-  \draw [->] (in syn) -- (B);
-  \draw (B) -- (neurons);
-  \draw [->] (sum) -- (neurons);
-  \draw [->] (neurons) -- node [text width=1cm] {decoded spikes} (sys);
-  \draw [->] (sys) -- node [text width=1cm] {$x(t)$} (probe);
+  \draw [->] (input) -- node {$u(t)$} (spk ens);
+  \draw [->] (spk ens) -- (B);
+  \draw (B) -- (syn);
+  \draw [->] (sum) -- (syn);
+  \draw [->] (syn) --  node {$x(t)$} (neurons);
+  \draw (neurons) -- (output split);
   \draw [->] (output split) |- (A);
   \draw [->] (A) -| (sum);
+  \draw [->] (sum) |- (probe syn);
+  \draw [->] (probe syn) -- node {$x(t)$} (probe);
 \end{tikzpicture} 
 \end{document}
