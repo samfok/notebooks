@@ -1,0 +1,36 @@
+\documentclass[convert={density=300,size=700x300,outext=.png}]{standalone}
+% \documentclass{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=2cm, >=latex']
+  \matrix[row sep=2em, column sep=3.5em] {
+    & \node[input] (n1) {}; & & & & \node [input] (n2) {}; & & \\    
+    \node [block] (input) {Node}; & 
+    \node [point] (spk ens) {}; &
+    \node [multiply] (B) {$B'$}; & 
+    \node [point] (sum) {} ; & 
+    \node [block] (syn) {$h(t)$}; & 
+    \node [point] (neurons) {}; &
+    \node [point] (output split) {}; \\ 
+    & & & & \node [multiply] (A) {$A'$}; & & & \\
+  };
+  \draw [-] (input) -- node {$u(t)$} (spk ens);
+  \draw [->] (spk ens) -- (B);
+  \draw (B) -- (syn);
+  \draw [->] (sum) -- (syn);
+  \draw (syn) --  node {$x(t)$} (neurons);
+  \draw (neurons) -- (output split);
+  \draw [->] (output split) |- (A);
+  \draw [->] (A) -| (sum);
+  \draw [->] (n1) -- node {$d_1\eta_1$} (spk ens);
+  \draw [->] (n2) -- node {$d_2\eta_2$} (neurons);
+\end{tikzpicture} 
+\end{document}
