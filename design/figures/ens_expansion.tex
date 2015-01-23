@@ -1,0 +1,29 @@
+\documentclass[convert={density=300,size=400x200,outext=.png}]{standalone}
+% \documentclass{standalone}
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+
+\begin{document}
+\tikzstyle{block} = [draw, rectangle, fill=blue!20,
+  minimum height=3em, minimum width=3em]
+\tikzstyle{multiply} = [draw, circle, fill=blue!20, minimum size=2em]
+\tikzstyle{point} = [coordinate]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\begin{tikzpicture}[auto, node distance=2cm, >=latex']
+\node [input] (input) {};
+\node [block, right of=input] (ens) {Ens};
+\node [output, right of=ens] (output) {};
+\draw [->] (input) -- node {$x$} (ens);
+\draw [->] (ens) -- node {$y$} (output);
+\node [input, below of=ens, node distance=1.5cm] (noise) {};
+\node [block, below of=noise, node distance=1.5cm] (soma) {somas};
+\node [input, left of=soma] (input2) {};
+\node [multiply, right of=soma] (d) {$d$};
+\node [output, right of=d] (output2) {};
+\draw [->] (input2) -- node {$x$} (soma);
+\draw [->] (noise) -- node {$\eta$} (soma);
+\draw [->] (soma) -- (d);
+\draw [->] (d) --  node {$y$} (output2);
+\end{tikzpicture}
+\end{document}
