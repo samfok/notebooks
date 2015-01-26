@@ -3,8 +3,14 @@ Framework (NEF).
 
 Index
 -----
-builder - Notebooks on building NEF networks
-encoding - Notebooks on encoding a quantity using neurons
-neuron - Notebooks on the neuron models used in NEF networks
-synapse - Notebooks on the synapse models used in NEF networks
-theory - Notebooks on theory related to NEF
+builder - Considers the mapping of NEF networks onto hardware
+
+design - Compares network and neuron designs
+
+encoding - Explores using neurons to encode a quantity
+
+neuron -  Analyzes the neuron models used in NEF networks
+
+synapse - Analyzes the synapse models used in NEF networks
+
+theory - Questions and answers (sometimes) NEF
