@@ -15,7 +15,6 @@ def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
 
     th_max_f = 1./tref
-    max_u = 5.
     u = np.array(np.sort(np.linspace(0, max_u, 100).tolist() +
                          [xt, 1.001*xt, 1.01*xt, 1.1*xt]))
     lif_fi = th_lif_fi(u, taum, tref, xt)
@@ -46,7 +45,6 @@ def sim_vs_num_af(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     cc = [(0, 0, .5*float(i)/n+.5) for i in xrange(n)]
 
     th_max_f = 1./tref
-    max_u = 5.
     u = np.array(np.sort(np.linspace(0, max_u, 100).tolist() +
                          [xt, 1.001*xt, 1.01*xt, 1.1*xt]))
     lif_fi = th_lif_fi(u, taum, tref, xt)
