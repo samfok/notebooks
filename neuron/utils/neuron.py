@@ -378,6 +378,8 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
 
     Parameters
     ----------
+    dt : float or array-like of floats
+        time step. If an array, indicates dt to use with each element of u.
     u : array-like of floats
         input
     taum : float
@@ -393,7 +395,13 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
     max_proc : int (optional)
         max number of cores to use
     """
-    args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
+    if isinstance(dt, (np.ndarray, list)):
+        assert len(dt) == len(u), (
+            'lengths of dt and u must match when dt is an array')
+        args = [(dt, u_val, taum, tref, xt, af, tauf)
+                for u_val, dt in zip(u, dt)]
+    else:
+        args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
 
     if (max_proc in (0, None)) or (len(u) == 1):
         sim_af = map(_sim_alif_fi_worker, args)
