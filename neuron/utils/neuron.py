@@ -524,10 +524,10 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
     if nneurons == 1:
         u.shape = u.shape[0], 1
 
-    decay = np.exp(-dt/tau)
+    decay = np.expm1(-dt/tau)+1  # expm1 higher precision version of exp
     increment = (1-decay)
 
-    fdecay = np.exp(-dt/tauf)
+    fdecay = np.expm1(-dt/tauf)+1  # expm1 higher precision version of exp
     fincrement = (1-fdecay)
 
     spiketimes = [[] for i in xrange(nneurons)]
@@ -549,25 +549,26 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
 
         # set voltages of neurons still in their refractory period to 0
         # and reduce voltage of neurons partway out of their ref. period
-        state[i, :] *= (1-refractory_time/dt).clip(0, 1)
+        state[i, :] *= (1 - refractory_time / dt).clip(0, 1)
 
         # determine which neurons spike
         spiked = state[i, :] > xt
-        spiked_idx = np.nonzero(spiked)[0]
-
-        # update feedback with current spikes
-        fstate[i, :] += fincrement*spiked/dt
 
         # linearly approximate time since neuron crossed spike threshold
         overshoot = (state[i, spiked] - xt) / dV[spiked]
-        interp_spiketime = dt * (1-overshoot)
-
-        for idx, spk_t in zip(spiked_idx, interp_spiketime):
-            spiketimes[idx].append(spk_t+i*dt)
+        interp_spiketime = dt * (1 - overshoot)
 
         # set spiking neurons' voltages to zero, and ref. time to tref
         state[i, spiked] = 0
         refractory_time[spiked] = tref + interp_spiketime
+
+        # update feedback with current spikes
+        fstate[i, :] += fincrement*spiked/dt
+
+        # note the specific spike times
+        spiked_idx = np.nonzero(spiked)[0]
+        for idx, spk_t in zip(spiked_idx, interp_spiketime):
+            spiketimes[idx].append(spk_t + i * dt)
 
     if nneurons == 1 and flatten1:
         spiketimes = np.array(spiketimes[0])
