@@ -1,7 +1,20 @@
 # plotting utility functions
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
+from matplotlib.colors import LinearSegmentedColormap
 from numpy import ones
+
+
+def make_red_cmap(low=0., high=1., name='red'):
+    """Creates a simple colormap red colormap"""
+    cdict = {'red': [(0.0, low, low),
+                     (1.0, high, high)],
+             'green': [(0.0, 0.0, 0.0),
+                       (1.0, 0.0, 0.0)],
+             'blue': [(0.0, 0.0, 0.0),
+                      (1.0, 0.0, 0.0)]}
+    cmap = LinearSegmentedColormap(name, cdict)
+    return cmap
 
 
 def _get_fig_ax(fig=None, ax=None, figp={}, axp={}, subplotp=(1, 1, 1)):

@@ -27,7 +27,7 @@ def th_lif_fi(u, tau, tref, xt):
     """
     if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
-    f = np.zeros(u.shape)
+    f = np.zeros_like(u)
     idx = u > xt
     f[idx] = (tref-tau*np.log(1.-xt/u[idx]))**-1.
     return f
@@ -78,6 +78,8 @@ def th_lif_if(f, tau, tref, xt):
     xt : float
         threshold
     """
+    if isinstance(f, (int, float)):  # handle scalars
+        f = np.array([f])
     assert (f > 0.).all(), "LIF tuning curve only invertible for f>0."
     u = xt/(1-np.exp((tref-1./f)/tau))
     return u
@@ -151,7 +153,7 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     """
     if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
-    f_ret = np.zeros(u.shape)
+    f_ret = np.zeros_like(u)
     f_high = max_f
     if max_f is None:
         f_high = 1./tref
@@ -164,8 +166,8 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     idx = u > u_min  # selects the range of u that produces spikes
     if not idx.any():
         return f_ret
-    tspk_high = np.zeros(u[idx].shape) + tspk_high
-    tspk_low = np.zeros(u[idx].shape) + tspk_low
+    tspk_high = np.zeros_like(u[idx]) + tspk_high
+    tspk_low = np.zeros_like(u[idx]) + tspk_low
 
     exit_msg = 'reached max iterations'
     for i in xrange(max_iter):
@@ -221,7 +223,7 @@ def scipy_alif_fi(u, taum, tref, xt, af, tauf, method=bisect,
         when maximum difference between estimated u and input u is within
         tol
     """
-    f_ret = np.zeros(u.shape)
+    f_ret = np.zeros_like(u)
     f_high = max_f
     if max_f is None:
         f_high = 1./tref
@@ -238,7 +240,7 @@ def scipy_alif_fi(u, taum, tref, xt, af, tauf, method=bisect,
     def _root_wrapper(tspk, taum, tref, xt, af, tauf, u):
         return u - _alif_u_tspk(tspk, taum, tref, xt, af, tauf)
 
-    f = np.zeros(u[idx].shape)
+    f = np.zeros_like(u[idx])
     for i, u_val in enumerate(u[idx]):
         tspk0 = method(_root_wrapper, tspk_low, tspk_high,
                        args=(taum, tref, xt, af, tauf, u_val),
@@ -287,10 +289,10 @@ def num_alif_fi_mu_apx(u, tau, tref, xt, af=1e-3, tauf=1e-2,
         u = np.array([u])
 
     f_high = th_lif_fi(u, tau, tref, xt)
-    f_ret = np.zeros(u.shape)
+    f_ret = np.zeros_like(u)
     idx = f_high > 0.
     f_high = f_high[idx]
-    f_low = np.zeros(f_high.shape)
+    f_low = np.zeros_like(f_high)
     exit_msg = 'reached max iterations'
     # import pdb; pdb.set_trace()
     for i in xrange(max_iter):
@@ -332,7 +334,7 @@ def sim_lif_fi(dt, u, tau, tref, xt):
     """
     # theory used to set how long to simulate
     th_f = th_lif_fi(u, tau, tref, xt)
-    sim_f = np.zeros(th_f.shape)
+    sim_f = np.zeros_like(th_f)
     for idx, u_val in enumerate(u):
         if th_f[idx] < .01:
             # estimated firing rate too low. would require too long to simulate
@@ -447,7 +449,7 @@ def run_lifsoma(dt, u, tau, tref, xt, ret_state=False, flatten1=True):
     increment = (1-decay)
 
     spiketimes = [[] for i in xrange(nneurons)]
-    state = np.zeros(u.shape)
+    state = np.zeros_like(u)
     refractory_time = np.zeros(nneurons)
 
     for i in xrange(1, nsteps):
@@ -531,7 +533,7 @@ def run_alifsoma(dt, u, tau, tref, xt, af=1e-2, tauf=1e-2,
     fincrement = (1-fdecay)
 
     spiketimes = [[] for i in xrange(nneurons)]
-    state = np.zeros(u.shape)
+    state = np.zeros_like(u)
     fstate = np.zeros((u.shape[0], u.shape[1]))  # +1 for end point edge case
     refractory_time = np.zeros(nneurons)
 
