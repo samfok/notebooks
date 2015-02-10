@@ -1,12 +1,14 @@
 # plotting utility functions
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
+import matplotlib.colors as colors
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.cm as mcm
 from numpy import ones
 
 
 def make_red_cmap(low=0., high=1., name='red'):
-    """Creates a simple colormap red colormap"""
+    """Creates a simple red colormap"""
     cdict = {'red': [(0.0, low, low),
                      (1.0, high, high)],
              'green': [(0.0, 0.0, 0.0),
@@ -15,6 +17,26 @@ def make_red_cmap(low=0., high=1., name='red'):
                       (1.0, 0.0, 0.0)]}
     cmap = LinearSegmentedColormap(name, cdict)
     return cmap
+
+
+def make_blue_cmap(low=0., high=1., name='blue'):
+    """Creates a simple blue colormap"""
+    cdict = {'red': [(0.0, 0.0, 0.0),
+                     (1.0, 0.0, 0.0)],
+             'green': [(0.0, 0.0, 0.0),
+                       (1.0, 0.0, 0.0)],
+             'blue': [(0.0, low, low),
+                      (1.0, high, high)]}
+    cmap = LinearSegmentedColormap(name, cdict)
+    return cmap
+
+
+def make_color_cycle(values, cmap):
+    """Generates a list of colors from a colormap cmap for values"""
+    cNorm = colors.Normalize(vmin=min(values), vmax=max(values))
+    scalarMap = mcm.ScalarMappable(norm=cNorm, cmap=cmap)
+    color_cycle = [scalarMap.to_rgba(value) for value in values]
+    return color_cycle
 
 
 def _get_fig_ax(fig=None, ax=None, figp={}, axp={}, subplotp=(1, 1, 1)):
