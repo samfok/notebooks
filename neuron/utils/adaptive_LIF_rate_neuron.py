@@ -5,7 +5,7 @@ from plot import make_blue_cmap, make_red_cmap, make_color_cycle
 
 
 def phase_uin_uf(tau_m, tref, xt, af, tau_f, dt,
-                 max_u=5., n_f=15):
+                 max_u_in=5., n_f=15):
     """Generates two phase plots of u_in vs f and u_f vs f
     
     Returns
@@ -15,7 +15,7 @@ def phase_uin_uf(tau_m, tref, xt, af, tau_f, dt,
     """
     inc = -np.expm1(-dt/tau_f)
 
-    u = np.sort(np.linspace(0, max_u, 20).tolist() + [xt, 1.001*xt])
+    u = np.sort(np.linspace(0, max_u_in, 20).tolist() + [xt, 1.001*xt])
     f = th_lif_fi(u, tau_m, tref, xt)
     max_f = max(f)
     min_f = max_f/10.
@@ -45,7 +45,7 @@ def phase_uin_uf(tau_m, tref, xt, af, tau_f, dt,
     bcmap = make_blue_cmap(low=1., high=0.)
     ax.quiver(U_in, F, dU_in, dF, dF,
               cmap=bcmap, alpha=.7, angles='xy')
-    ax.set_xlim(0, max_u)
+    ax.set_xlim(0, max_u_in)
     ax.legend(loc='upper left')
     ax.set_xlabel(r'$u_{in}$', fontsize=20)
     ax.set_ylabel(r'$f$', fontsize=20)
@@ -86,7 +86,7 @@ def phase_uin_uf(tau_m, tref, xt, af, tau_f, dt,
     ax.quiver(U_f, F, dU_f, dF, dF,
               cmap=bcmap, alpha=.7, angles='xy')
 
-    u_f = np.array([0, max_u])
+    u_f = np.array([0, max_u_in])
     f = u_f / af
     ax.plot(u_f, f, 'c', label=r'$u_f=\alpha_ff$')
 
@@ -95,7 +95,7 @@ def phase_uin_uf(tau_m, tref, xt, af, tau_f, dt,
     ax.plot(u_f, ralif_f, 'co', alpha=1.)
     fig.axes[0].plot(u_in, ralif_f, 'co', alpha=1.)
 
-    ax.set_xlim(0, max_u)
+    ax.set_xlim(0, max_u_in)
     ax.set_ylim(0, 1./tref)
     ax.legend(loc='upper left', fontsize=16)
     ax.set_xlabel(r'$u_f$', fontsize=20)
@@ -203,17 +203,45 @@ def phase_u_uf(tau_m, tref, xt, af, tau_f, dt,
     return fig
 
 
-def u_in_traj(u_in, tau_m, tref, xt, af, tau_f, dt=1e-3, T=None, f0=0.):
-    """Generates a trajectory resulting from u_in
+def u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
+              dt=1e-3, T=None, u0=None, f0=None):
+    """Generates a trajectory given a fixed u_in
+
+    Parameters
+    ----------
+    u_in : array-like (m x n)
+        inputs to the m neurons for each of the n time steps
+    tau_m : float
+        soma time constant (s)
+    xt : float
+        threshold
+    af : float (optional)
+        scales the feedback synapse state into a current
+    tau_f : float (optional)
+        time constant of the feedback synapse
+    dt : float (optional)
+        time step (s)
+    T : float (optional)
+        total simulation time, defaults to 5 * tau_f
+    u0 : array-like (m,) or float (optional)
+        initial net input to the neurons
+    f0 : array-like (m,) or float (optional)
+        initial rates of the neurons
     
     Returns
     -------
-    f : rates
-    uf: adaptive feedback
+    f : numpy array (m x n)
+        neuron rates
+    u_net : numpy array (m x n)
+        net input to neurons
     """
     if T is None:
         T = 5.*tau_f
+    if u0 is None:
+        u0 = u_in
+    if f0 is None:
+        f0 = th_lif_fi(u0, tau_m, tref, xt)
     n_steps = int(np.ceil(T/dt))
     u_in = u_in * np.ones(n_steps)
-    f, uf = run_ralifsoma(dt, u_in, tau_m, tref, xt, af, tau_f, f0)
-    return f, uf
+    f, u_net = run_ralifsoma(dt, u_in, tau_m, tref, xt, af, tau_f, f0, u0)
+    return f, u_net

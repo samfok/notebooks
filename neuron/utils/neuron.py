@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.optimize import bisect
 from multiprocessing import Pool, cpu_count
+from data import scalar_to_array
 
 
 ###############################################################################
@@ -25,8 +26,7 @@ def th_lif_fi(u, tau, tref, xt):
     xt : float
         threshold
     """
-    if isinstance(u, (int, float)):  # handle scalars
-        u = np.array([u])
+    u = scalar_to_array(u)
     f = np.zeros_like(u)
     idx = u > xt
     f[idx] = (tref-tau*np.log(1.-xt/u[idx]))**-1.
@@ -52,8 +52,7 @@ def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
         Whether to clip negative values in the approximation to 0
     """
     assert a > xt, "a must be > xt"
-    if isinstance(u, (int, float)):  # handle scalars
-        u = np.array([u])
+    u = scalar_to_array(u)
     k1 = tau*xt/((tref-tau*np.log(1-xt/a))**2*a*(a-xt))
     k0 = th_lif_fi(a, tau, tref, xt) - k1*a
     f = k0 + k1*u
@@ -85,6 +84,43 @@ def th_lif_if(f, tau, tref, xt):
     return u
 
 
+def _th_lif_dfdu(u, f, tau, tref, xt, out):
+    out = f**2 * tau * xt / (u * (u-xt))
+    return out
+
+
+def th_lif_dfdu(u, tau, tref, xt, out=None):
+    """Derivative of the LIF firing rate with respect to the input
+
+    Parameters
+    ----------
+    u : array-like of floats
+        input
+    tau : float
+        membrane time constant
+    tref : float
+        refractory period
+    xt : float
+        threshold
+    out : array-like (optional)
+    """
+    u = scalar_to_array(u)
+    f = th_lif_fi(u, tau, tref, xt)
+    dfdu = out
+    if dfdu is None:
+        dfdu = np.zeros_like(u)
+    if (u > xt).all():  # faster
+        dfdu = _th_lif_dfdu(u, f, tau, tref, xt, dfdu)
+    else:  # handles below threshold inputs
+        idx = u > xt
+        dfdu[idx] = _th_lif_dfdu(u[idx], f[idx], tau, tref, xt, dfdu[idx])
+        idx = u < xt
+        dfdu[idx] = 0.
+        idx = u == xt
+        dfdu[idx] = np.nan
+    return dfdu
+
+
 def th_usyn_xmin(lam, tau):
     """Theoretical steady state xmin for synapse with uniform input"""
     ret = np.zeros(len(lam))
@@ -94,7 +130,7 @@ def th_usyn_xmin(lam, tau):
 
 
 def th_usyn_xmax(lam, tau):
-    """Theoretical steady state xmax for synapse with uniform input"""    
+    """Theoretical steady state xmax for synapse with uniform input"""
     ret = np.zeros(len(lam))
     idx = lam > 0
     ret[idx] = 1./(tau*(1.-np.exp(-1./(lam[idx]*tau))))
@@ -104,20 +140,20 @@ def th_usyn_xmax(lam, tau):
 ###############################################################################
 # numerical methods for determining input, firing rate relations ##############
 ###############################################################################
-def _alif_u_tspk(tspk, taum, tref, xt, af, tauf):
+def _alif_u_tspk(tspk, tau_m, tref, xt, af, tauf):
     """Computes the input u from tspk for an adaptive LIF neuron"""
-    t0 = 1./(1-np.exp(-tspk/taum))
-    if taum != tauf:
-        t1 = af*np.exp(-tref/tauf)*(np.exp(-tspk/tauf)-np.exp(-tspk/taum))
-        t2 = (1.-np.exp(-(tref+tspk)/tauf))*(taum-tauf)
-    elif taum == tauf:  # because Python doesn't know LHopital's Rule
-        t1 = -af*tspk*np.exp(-(tref+tspk)/taum)
-        t2 = taum**2*(1-np.exp(-(tref+tspk)/taum))
+    t0 = 1./(1-np.exp(-tspk/tau_m))
+    if tau_m != tauf:
+        t1 = af*np.exp(-tref/tauf)*(np.exp(-tspk/tauf)-np.exp(-tspk/tau_m))
+        t2 = (1.-np.exp(-(tref+tspk)/tauf))*(tau_m-tauf)
+    elif tau_m == tauf:  # because Python doesn't know LHopital's Rule
+        t1 = -af*tspk*np.exp(-(tref+tspk)/tau_m)
+        t2 = tau_m**2*(1-np.exp(-(tref+tspk)/tau_m))
     u = t0*(xt-t1/t2)
     return u
 
 
-def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
+def num_alif_fi(u, tau_m, tref, xt, af, tauf, min_f=.001, max_f=None,
                 max_iter=100, tol=1e-3, verbose=False):
     """Numerically determine the approximate adaptive LIF neuron tuning curve
 
@@ -128,7 +164,7 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     ----------
     u : array-like of floats
         input
-    taum : float
+    tau_m : float
         membrane time constant
     tref : float
         refractory period
@@ -162,7 +198,7 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     tspk_low = 1./f_high - tref
 
     # check for u that produces firing rates below the minimum firing rate
-    u_min = _alif_u_tspk(tspk_high, taum, tref, xt, af, tauf)
+    u_min = _alif_u_tspk(tspk_high, tau_m, tref, xt, af, tauf)
     idx = u > u_min  # selects the range of u that produces spikes
     if not idx.any():
         return f_ret
@@ -173,7 +209,7 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     for i in xrange(max_iter):
         assert (tspk_low <= tspk_low).all(), 'binary search failed'
         tspk = (tspk_high+tspk_low)/2.
-        uhat = _alif_u_tspk(tspk, taum, tref, xt, af, tauf)
+        uhat = _alif_u_tspk(tspk, tau_m, tref, xt, af, tauf)
         max_diff = np.max(np.abs(u[idx]-uhat))
         if max_diff < tol:
             exit_msg = 'reached tolerance in %d iterations' % (i+1)
@@ -188,7 +224,7 @@ def num_alif_fi(u, taum, tref, xt, af, tauf, min_f=.001, max_f=None,
     return f_ret
 
 
-def scipy_alif_fi(u, taum, tref, xt, af, tauf, method=bisect,
+def scipy_alif_fi(u, tau_m, tref, xt, af, tauf, method=bisect,
                   min_f=.001, max_f=None, max_iter=100):
     """Numerically determine the approximate adaptive LIF neuron tuning curve
 
@@ -198,7 +234,7 @@ def scipy_alif_fi(u, taum, tref, xt, af, tauf, method=bisect,
     ----------
     u : array-like of floats
         input
-    taum : float
+    tau_m : float
         membrane time constant
     tref : float
         refractory period
@@ -232,25 +268,25 @@ def scipy_alif_fi(u, taum, tref, xt, af, tauf, method=bisect,
     tspk_low = 1./f_high - tref
 
     # check for u that produces firing rates below the minimum firing rate
-    u_min = _alif_u_tspk(tspk_high, taum, tref, xt, af, tauf)
+    u_min = _alif_u_tspk(tspk_high, tau_m, tref, xt, af, tauf)
     idx = u > u_min  # selects the range of u that produces spikes
     if not idx.any():
         return f_ret
 
-    def _root_wrapper(tspk, taum, tref, xt, af, tauf, u):
-        return u - _alif_u_tspk(tspk, taum, tref, xt, af, tauf)
+    def _root_wrapper(tspk, tau_m, tref, xt, af, tauf, u):
+        return u - _alif_u_tspk(tspk, tau_m, tref, xt, af, tauf)
 
     f = np.zeros_like(u[idx])
     for i, u_val in enumerate(u[idx]):
         tspk0 = method(_root_wrapper, tspk_low, tspk_high,
-                       args=(taum, tref, xt, af, tauf, u_val),
+                       args=(tau_m, tref, xt, af, tauf, u_val),
                        maxiter=max_iter)
         f[i] = 1./(tref+tspk0)
     f_ret[idx] = f
     return f_ret
 
 
-def num_alif_fi_mu_apx(u, taum, tref, xt, af=1e-3, tauf=1e-2,
+def num_alif_fi_mu_apx(u, tau_m, tref, xt, af=1e-3, tauf=1e-2,
                        max_iter=100, rel_tol=1e-3,
                        spiking=True, verbose=False):
     """Numerically determine the approximate adaptive LIF neuron tuning curve
@@ -266,7 +302,7 @@ def num_alif_fi_mu_apx(u, taum, tref, xt, af=1e-3, tauf=1e-2,
     ----------
     u : array-like of floats
         input
-    taum : float
+    tau_m : float
         membrane time constant
     tref : float
         refractory period
@@ -293,7 +329,7 @@ def num_alif_fi_mu_apx(u, taum, tref, xt, af=1e-3, tauf=1e-2,
     if isinstance(u, (int, float)):  # handle scalars
         u = np.array([u])
 
-    f_high = th_lif_fi(u, taum, tref, xt)
+    f_high = th_lif_fi(u, tau_m, tref, xt)
     f_ret = np.zeros_like(u)
     idx = f_high > 0.
     f_high = f_high[idx]
@@ -301,7 +337,7 @@ def num_alif_fi_mu_apx(u, taum, tref, xt, af=1e-3, tauf=1e-2,
     exit_msg = 'reached max iterations'
     for i in xrange(max_iter):
         f = (f_high+f_low)/2.
-        u_net = th_lif_if(f, taum, tref, xt)
+        u_net = th_lif_if(f, tau_m, tref, xt)
         uf = f*af
         uhat = u_net + uf
         high_idx = uhat > u[idx]
@@ -321,7 +357,7 @@ def num_alif_fi_mu_apx(u, taum, tref, xt, af=1e-3, tauf=1e-2,
 
 def num_rate_alif_fi(*args, **kwargs):
     """Numerically determine the rate based adaptive LIF neuron tuning curve
-    
+
     Same as num_alif_fi_mu_apx with spiking set to False
     See num_alif_fi_mu_apx for parameter descriptions
     """
@@ -370,8 +406,8 @@ def _sim_alif_fi_worker(args):
     return _sim_alif_fi_worker_unwrapped(*args)
 
 
-def _sim_alif_fi_worker_unwrapped(dt, u, taum, tref, xt, af, tauf):
-    num_af = num_alif_fi(u, taum, tref, xt, af, tauf)
+def _sim_alif_fi_worker_unwrapped(dt, u, tau_m, tref, xt, af, tauf):
+    num_af = num_alif_fi(u, tau_m, tref, xt, af, tauf)
     if num_af < .01:
         # estimated firing rate too low. would require too long to simulate
         return 0.
@@ -379,7 +415,7 @@ def _sim_alif_fi_worker_unwrapped(dt, u, taum, tref, xt, af, tauf):
     # run long enough to reach steady state and collect some spikes
     run_time = 5.*tauf+5.*T_af
     u_in = u+np.zeros(int(np.ceil(run_time/dt)))
-    spike_times = run_alifsoma(dt, u_in, taum, tref, xt, af, tauf)
+    spike_times = run_alifsoma(dt, u_in, tau_m, tref, xt, af, tauf)
     isi = np.diff(spike_times[-3:])
     assert ((isi[-2]-isi[-1])/isi[-2] < .01), (
         'sim_alif_fi: Greater than 1% change in isi between last two isi. ' +
@@ -387,7 +423,7 @@ def _sim_alif_fi_worker_unwrapped(dt, u, taum, tref, xt, af, tauf):
     return 1./isi[-1]
 
 
-def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
+def sim_alif_fi(dt, u, tau_m, tref, xt, af=1e-3, tauf=1e-2,
                 max_proc=cpu_count()-1):
     """Find the adaptive LIF tuning curve by simulating the neuron
 
@@ -397,7 +433,7 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
         time step. If an array, indicates dt to use with each element of u.
     u : array-like of floats
         input
-    taum : float
+    tau_m : float
         membrane time constant
     tref : float
         refractory period
@@ -413,10 +449,10 @@ def sim_alif_fi(dt, u, taum, tref, xt, af=1e-3, tauf=1e-2,
     if isinstance(dt, (np.ndarray, list)):
         assert len(dt) == len(u), (
             'lengths of dt and u must match when dt is an array')
-        args = [(dt, u_val, taum, tref, xt, af, tauf)
-                for u_val, dt in zip(u, dt)]
+        args = [(dt_val, u_val, tau_m, tref, xt, af, tauf)
+                for u_val, dt_val in zip(u, dt)]
     else:
-        args = [(dt, u_val, taum, tref, xt, af, tauf) for u_val in u]
+        args = [(dt, u_val, tau_m, tref, xt, af, tauf) for u_val in u]
 
     if (max_proc in (0, None)) or (len(u) == 1):
         sim_af = map(_sim_alif_fi_worker, args)
@@ -505,7 +541,7 @@ def run_lifsoma(dt, u, tau, tref, xt, ret_state=False, flatten1=True):
     return retval
 
 
-def run_alifsoma(dt, u, taum, tref, xt, af=1e-2, tauf=1e-2,
+def run_alifsoma(dt, u, tau_m, tref, xt, af=1e-2, tauf=1e-2,
                  ret_state=False, ret_fstate=False, flatten1=True):
     """Simulates an adaptive LIF soma(s) given an input current
 
@@ -517,7 +553,7 @@ def run_alifsoma(dt, u, taum, tref, xt, af=1e-2, tauf=1e-2,
         time step (s)
     u : array-like (m x n)
         inputs for each time step
-    taum : float
+    tau_m : float
         soma time constant (s)
     xt : float
         threshold
@@ -539,7 +575,7 @@ def run_alifsoma(dt, u, taum, tref, xt, af=1e-2, tauf=1e-2,
     if nneurons == 1:
         u.shape = u.shape[0], 1
 
-    decay = np.expm1(-dt/taum)+1  # expm1 higher precision version of exp
+    decay = np.expm1(-dt/tau_m)+1  # expm1 higher precision version of exp
     increment = (1-decay)
 
     fdecay = np.expm1(-dt/tauf)+1  # expm1 higher precision version of exp
@@ -601,7 +637,8 @@ def run_alifsoma(dt, u, taum, tref, xt, af=1e-2, tauf=1e-2,
     return retval
 
 
-def run_ralifsoma(dt, u_in, taum, tref, xt, af=1e-2, tauf=1e-2, f0=0.):
+def run_ralifsoma(dt, u_in, tau_m, tref, xt, af=1e-2, tauf=1e-2,
+                  f0=0., u0=None):
     """Simulates a rate-based adaptive LIF soma(s) given an input current
 
     Returns the rates of the rate-based adaptive LIF soma
@@ -612,7 +649,7 @@ def run_ralifsoma(dt, u_in, taum, tref, xt, af=1e-2, tauf=1e-2, f0=0.):
         time step (s)
     u_in : array-like (m x n)
         inputs for each time step
-    taum : float
+    tau_m : float
         soma time constant (s)
     xt : float
         threshold
@@ -622,6 +659,8 @@ def run_ralifsoma(dt, u_in, taum, tref, xt, af=1e-2, tauf=1e-2, f0=0.):
         time constant of the feedback synapse
     f0 : array-like (n,) (optional)
         initial firing rate; also defines the initial feedback
+    u0 : array-like (n,) (optional)
+        initial net input
     """
     nneurons = 1
     if len(u_in.shape) > 1:
@@ -630,15 +669,23 @@ def run_ralifsoma(dt, u_in, taum, tref, xt, af=1e-2, tauf=1e-2, f0=0.):
     if nneurons == 1:
         u_in.shape = u_in.shape[0], 1
 
-    ufdecay = np.expm1(-dt/tauf)+1
-    ufincrement = (1-ufdecay)
+    decay = np.expm1(-dt/tauf)+1
+    increment = (1-decay)
     f = np.zeros_like(u_in)
-    uf = np.zeros_like(u_in)
+    dfdu = np.zeros_like(u_in)
+    u = np.zeros_like(u_in)
     f[0, :] = f0
-    idx = f[0, :] > 0
-    uf[0, idx] = u_in[0, idx] - th_lif_if(f[0, idx], taum, tref, xt)
+    if u0 is None:
+        idx = f[0, :] > 0
+        u[0, idx] = th_lif_if(f[0, idx], tau_m, tref, xt)
+    else:
+        u[0, :] = u0
     for i in xrange(1, nsteps):
-        uf[i, :] = ufdecay*uf[i-1, :] + ufincrement*af*f[i-1, :]
-        f[i, :] = th_lif_fi(u_in[i, :]-uf[i, :], taum, tref, xt)
+        dudt = 1./tauf * (-u[i-1, :] + u_in[i-1, :] - af*f[i-1, :])
+        # dudt = increment * (-u[i-1, :] + u_in[i-1, :] - af*f[i-1, :])
+        dfdu = th_lif_dfdu(u[i-1, :], tau_m, tref, xt, dfdu)
+        dfdt = dfdu * dudt
+        u[i, :] = u[i-1, :] + dudt * dt
+        f[i, :] = f[i-1, :] + dfdt * dt
 
-    return f, uf
+    return f, u

@@ -7,6 +7,53 @@ from neuron import (
 from signal import filter_spikes
 
 
+def demo_adaptive_intuition(title_str='', k=None, tau_adapt=None):
+    """Demos a synapse driven by adaptive vs nonadaptive inputs"""
+    n = 1000
+    u1_val = 1.
+    t, dt = np.linspace(-1, 8, n, retstep=True)
+    u1 = u1_val*np.ones(t.shape) * (t >= 0)
+    x1 = u1*(1-np.exp(-t))
+    ylim = (0, u1_val*1.1)
+    if k is not None:
+        u2 = k*u1
+        x2 = u2*(1-np.exp(-t))
+        ylim = (0, k*u1_val*1.1)
+
+    if tau_adapt is not None:
+        u3 = u1+(u2-u1)*np.exp(-t/tau_adapt)
+        decay = np.exp(-dt)
+        increment = 1-decay
+        x3 = np.zeros(n)
+        for i in xrange(1, n):
+            x3[i] = decay*x3[i-1]+increment*u3[i]
+        ylim = (0, k*u1_val*1.1)
+
+    fig = figure(figsize=(8, 6))
+    ax = fig.add_subplot(211)
+    ax.plot(t, x1, lw=2, c='b', label=r'$x_1$')
+    ax.axhline(u1_val, c='b', ls=':')
+    if k is not None:
+        ax.plot(t, x2, lw=2, c='r', label=r'$x_2$')
+        ax.axhline(k*u1_val, c='r', ls=':')
+    if tau_adapt is not None:
+        ax.plot(t, x3, lw=2, c='m', label=r'$x_3$')
+    ax.legend(loc='lower right', fontsize=14)
+    ax.set_ylim(ylim)
+    ax.set_ylabel('synapse output', fontsize=16)
+    ax.set_title(title_str, fontsize=16)
+    ax = fig.add_subplot(212)
+    ax.plot(t, u1, lw=2, c='b', label=r'$u_1$')
+    if k is not None:
+        ax.plot(t, u2, lw=2, c='r', label=r'$u_2$')
+    if tau_adapt is not None:
+        ax.plot(t, u3, lw=2, c='m', label=r'$u_3$')
+    ax.set_ylim(ylim)
+    ax.legend(loc='lower right', fontsize=14)
+    ax.set_xlabel(r'time ($\tau$)', fontsize=20)
+    ax.set_ylabel('input', fontsize=18)
+
+
 def sim_vs_num_tauf(dt, T, max_u, taum, tref, xt, af, tauf, ax=None):
     n = len(tauf)
     if ax is None:
