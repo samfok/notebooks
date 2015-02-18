@@ -1,6 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from neuron import th_lif_fi, th_lif_if, num_rate_alif_fi, run_ralifsoma
+from matplotlib import pyplot as plt
+from neuron import (
+    th_lif_fi, th_lif_if, num_rate_alif_fi, run_ralifsoma, th_lif_dfdu)
 from plot import make_blue_cmap, make_red_cmap, make_color_cycle
 
 
@@ -203,6 +204,54 @@ def phase_u_uf(tau_m, tref, xt, af, tau_f, dt,
     return fig
 
 
+def phase_u_f(tau_m, tref, xt, af, tau_f, dt, max_u=5., u_in=3.5):
+    """Generates a phase plot of u vs """
+    def th_du_dt(u_net, u_in, f, af, tau_f):
+        return 1./tau_f * (-u_net + u_in - af*f)
+    
+    min_f, nf = 10., 15
+    _u = np.sort(np.linspace(0, max_u, 100).tolist() + [xt, xt*1.001])
+    _f = th_lif_fi(_u, tau_m, tref, xt)
+    max_f = 1./tref
+    fig = plt.figure(figsize=(8,6))
+    ax = fig.add_subplot(111)
+    ax.plot(_u, _f, 'k')
+    
+    u_vals = np.linspace(0., max_u, 20)
+    f_step = max_f/20.
+    
+    U, F, dUdt, dFdt = [], [], [], []
+    for u_val in u_vals:
+        f_open = max_f
+        f = np.array(np.arange(min_f, f_open, f_step).tolist() + [f_open])
+        u = u_val * np.ones(f.shape)
+        dudt = th_du_dt(u, u_in, f, af, tau_f)
+        dfdu = th_lif_dfdu(u, tau_m, tref, xt)
+        dfdt = dfdu*dudt
+        
+        U += u.tolist()
+        F += f.tolist()
+        dUdt += dudt.tolist()
+        dFdt += dfdt.tolist()
+    
+    bcmap = make_blue_cmap()
+    ax.quiver(U, F, dUdt, dFdt, dFdt, angles='xy', cmap=bcmap, alpha=.7)
+    
+    f_ss = (u_in - _u) / af
+    ax.plot(_u, f_ss, 'c')
+    num_f = num_rate_alif_fi(u_in, tau_m, tref, xt, af, tau_f)
+    uf = af*num_f
+    num_u = u_in - uf
+    ax.plot(num_u, num_f, 'co')
+    
+    ax.set_xlim(0, max_u)
+    ax.set_ylim(0, 1./tref)
+    ax.set_xlabel(r'$u_{net}$', fontsize=20)
+    ax.set_ylabel(r'$f$', fontsize=20)
+
+    return fig, ax
+
+
 def u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
               dt=1e-3, T=None, u0=None, f0=None):
     """Generates a trajectory given a fixed u_in
@@ -245,3 +294,10 @@ def u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
     u_in = u_in * np.ones(n_steps)
     f, u_net = run_ralifsoma(dt, u_in, tau_m, tref, xt, af, tau_f, f0, u0)
     return f, u_net
+
+
+def add_traj(ax, u_in, tau_m, tref, xt, af, tau_f, dt=1e-3,
+             T=None, u0=None, f0=None):
+    f, u_net = u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
+                         dt=dt, T=T, u0=u0, f0=f0)
+    ax.plot(u_net, f, 'o-m')

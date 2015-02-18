@@ -113,7 +113,8 @@ def th_lif_dfdu(u, tau, tref, xt, out=None):
         dfdu = _th_lif_dfdu(u, f, tau, tref, xt, dfdu)
     else:  # handles below threshold inputs
         idx = u > xt
-        dfdu[idx] = _th_lif_dfdu(u[idx], f[idx], tau, tref, xt, dfdu[idx])
+        if idx.any():
+            dfdu[idx] = _th_lif_dfdu(u[idx], f[idx], tau, tref, xt, dfdu[idx])
         idx = u < xt
         dfdu[idx] = 0.
         idx = u == xt
@@ -672,7 +673,7 @@ def run_ralifsoma(dt, u_in, tau_m, tref, xt, af=1e-2, tauf=1e-2,
     decay = np.expm1(-dt/tauf)+1
     increment = (1-decay)
     f = np.zeros_like(u_in)
-    dfdu = np.zeros_like(u_in)
+    dfdu = np.zeros(u_in.shape[1])
     u = np.zeros_like(u_in)
     f[0, :] = f0
     if u0 is None:
@@ -682,7 +683,6 @@ def run_ralifsoma(dt, u_in, tau_m, tref, xt, af=1e-2, tauf=1e-2,
         u[0, :] = u0
     for i in xrange(1, nsteps):
         dudt = 1./tauf * (-u[i-1, :] + u_in[i-1, :] - af*f[i-1, :])
-        # dudt = increment * (-u[i-1, :] + u_in[i-1, :] - af*f[i-1, :])
         dfdu = th_lif_dfdu(u[i-1, :], tau_m, tref, xt, dfdu)
         dfdt = dfdu * dudt
         u[i, :] = u[i-1, :] + dudt * dt
