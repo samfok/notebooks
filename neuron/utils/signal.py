@@ -40,6 +40,7 @@ def make_uniform_spikes(rate, nspikes, rng=np.random):
         spike_times = np.array([spike_times])
     return spike_times
 
+
 def filter_spikes(dt, duration, spike_times, tau, ret_time=True):
     """Filters spikes with a synapse (first order low-pass filter)
     
