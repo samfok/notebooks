@@ -62,10 +62,8 @@ def taylor1_lif_fi(a, u, tau, tref, xt, clip_subxt=False):
 
 
 def th_lif_if(f, tau, tref, xt):
-    """Theoretical inverse of the LIF tuning curve
+    """Theoretically invert the LIF tuning curve
 
-    Computes input from firing rate with
-    u = xt/(1-exp((tref-1/f)/tau))
     Parameters
     ----------
     f : array-like of floats
@@ -76,6 +74,8 @@ def th_lif_if(f, tau, tref, xt):
         refractory period
     xt : float
         threshold
+
+    Returns the input that produced the given firing rates.
     """
     f = scalar_to_array(f)
     assert (f > 0.).all(), "LIF tuning curve only invertible for f>0."
@@ -119,6 +119,32 @@ def th_lif_dfdu(u, tau, tref, xt, out=None):
         idx = u == xt
         dfdu[idx] = np.nan
     return dfdu
+
+
+def th_ralif_if(f, tau_m, tref, xt, af):
+    """Theoretically invert the rate-based adaptive LIF tuning curve
+
+    Parameters
+    ----------
+    f : array-like of floats
+        firing rates (must be > 0)
+    tau_m : float
+        membrane time constant
+    tref : float
+        refractory period
+    xt : float
+        threshold
+    af : float (optional)
+        scales the feedback synapse state into a current
+
+    Returns the input that produced the given firing rates.
+    """
+    f = scalar_to_array(f)
+    assert (f > 0.).all(), "raLIF tuning curve only invertible for f>0."
+    u_net = th_lif_if(f, tau_m, tref, xt)
+    u_f = af * f
+    u_in = u_net + u_f
+    return u_in
 
 
 def th_usyn_xmin(lam, tau):
@@ -357,7 +383,7 @@ def num_alif_fi_mu_apx(u_in, tau_m, tref, xt, af, tau_f,
 
 
 def num_ralif_fi(*args, **kwargs):
-    """Numerically determine the rate based adaptive LIF neuron tuning curve
+    """Numerically determine the rate-based adaptive LIF neuron tuning curve
 
     Same as num_alif_fi_mu_apx with spiking set to False
     See num_alif_fi_mu_apx for parameter descriptions
@@ -365,62 +391,11 @@ def num_ralif_fi(*args, **kwargs):
     Note that tau_f is not relevant to finding the rate-based adaptive LIF
     neuron's steady-state firing rate
     """
-    return num_alif_fi_mu_apx(*args, spiking=False, **kwargs)
-
-
-def num_ralif_if(f, tau_m, tref, xt, af,
-                 max_iter=100, rel_tol=1e-3, verbose=False):
-    """Numerically invert the rate based adaptive LIF neuron tuning curve
-
-    Assumes that the initial firing rate is the open loop firing rate
-    Parameters
-    ----------
-    f : array-like of floats
-        firing rates (must be > 0)
-    tau_m : float
-        membrane time constant
-    tref : float
-        refractory period
-    xt : float
-        threshold
-    af : float (optional)
-        scales the inhibitory feedback
-    tau_f : float (optional)
-        time constant of the feedback synapse
-    max_iter : int (optional)
-        maximium number of iterations in binary search
-    rel_tol : float (optional)
-        relative tolerance of binary search algorithm. The algorithm terminates
-        when the maximum relative difference between the estimated u_in and the
-        input u_in is within rel_tol
-    verbose : bool (optional)
-        If True, prints whether algorithm finishes successfully by satisfying
-        the tolerance or failed by reaching the maximum number of iterations
-    """
-    assert af > 0, "inhibitory feedback scaling must be > 0"
-    # f = scalar_to_array(f)
-    # assert (f > 0.).all(), "raLIF tuning curve only invertible for f>0."
-    # u_low = np.zeros_like(f)
-    # u_high = th_lif_if(f, tau_m, tref, xt)
-
-    # exit_msg = 'reached max iterations'
-    # for i in xrange(max_iter):
-    #     f = (f_high+f_low)/2.
-    #     u_net = th_lif_if(f, tau_m, tref, xt)
-    #     uf = f*af
-    #     uhat = u_net + uf
-    #     high_idx = uhat > u_in[idx]
-    #     low_idx = uhat <= u_in[idx]
-    #     f_high[high_idx] = f[high_idx]
-    #     f_low[low_idx] = f[low_idx]
-
-    #     max_rel_diff = np.max(np.abs(uhat-u_in[idx])/u_in[idx])
-    #     if max_rel_diff < rel_tol:
-    #         exit_msg = 'reached tolerance'
-    #         break
-    # if verbose:
-    #     print exit_msg
-    # return u_in
+    assert len(args) < 6, (
+        'num_ralif_fi only takes up to 5 positional inputs. Are you passing ' +
+        'in a tau_f by accident? num_ralif_fi does not use tau_f')
+    assert 'tau_f' not in kwargs, 'num_ralif_fi does not use tau_f'
+    return num_alif_fi_mu_apx(*args, tau_f=None, spiking=False, **kwargs)
 
 
 ###############################################################################

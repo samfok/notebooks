@@ -1,7 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from neuron import (
-    th_lif_fi, num_ralif_fi, run_ralifsoma, th_lif_dfdu, run_lifsoma)
+    th_lif_fi, th_lif_if, th_lif_dfdu, th_ralif_if,
+    num_alif_fi, num_ralif_fi, run_ralifsoma,
+    run_lifsoma, run_alifsoma)
 from plot import make_blue_cmap, make_red_cmap, make_color_cycle
 from signal import filter_spikes
 from nengo.synapses import filt
@@ -36,7 +38,7 @@ def phase_u_f(tau_m, tref, xt, af, tau_f, dt=1e-4, max_u=5., u_in=3.5,
         dFdt += dfdt.tolist()
 
     f_ss = (u_in - _u) / af
-    num_f = num_ralif_fi(u_in, tau_m, tref, xt, af, tau_f)
+    num_f = num_ralif_fi(u_in, tau_m, tref, xt, af)
     uf = af*num_f
     num_u = u_in - uf
 
@@ -98,7 +100,8 @@ def u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
         f0 = th_lif_fi(u0, tau_m, tref, xt)
     n_steps = int(np.ceil(T/dt))
     u_in = u_in * np.ones(n_steps)
-    f, u_net = run_ralifsoma(dt, u_in, tau_m, tref, xt, af, tau_f, f0, u0)
+    f, u_net = run_ralifsoma(
+        dt, u_in, tau_m, tref, xt, af, tau_f, f0, u0, ret_u=True)
     return f, u_net
 
 
@@ -110,6 +113,7 @@ def add_traj(ax, u_in, tau_m, tref, xt, af, tau_f, dt=1e-4,
 
 
 def u_in_gain(tau_m, tref, xt, af):
+    """Computes relative gain between open and closed loop tuning curves"""
     max_u = 5.
     u_in = np.array(
         [0.] + np.logspace(np.log10(xt), np.log10(2.*xt), 20).tolist() +
@@ -155,48 +159,76 @@ def u_in_gain(tau_m, tref, xt, af):
     if n == 1:
         title_str += label_str
     else:
-        ax_f.legend(loc='upper right', bbox_to_anchor=(.6, 1.))
-        ax_g.legend(loc='upper left', bbox_to_anchor=(.6, 1.))
+        ax_f.legend(loc='upper right', bbox_to_anchor=(.7, 1.))
+        ax_g.legend(loc='upper left', bbox_to_anchor=(.7, 1.))
     ax_f.set_title(title_str, fontsize=14)
 
 
-T = 5. * tau_f
-N = int(np.ceil(T/dt))
-for u_in_val in u_ins:
-    u_in = u_in_val + np.zeros(N)
-    alif_ss_rate = num_alif_fi(u_in_val, tau_m, tref, xt, af, tau_f)
-    ralif_ss_rate = num_ralif_fi(u_in_val, tau_m, tref, xt, af, tau_f)
+def rate_v_spiking(u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
+                   normalize=False):
+    """Compares the raLIF aLIF, and LIF soma outputs
+
+    Input to the raLIF and LIF neurons adjusted to so their steady-state output
+    matches the aLIF steady-state output
+
+    Parameters
+    ----------
+    u_in : array-like (m x n)
+        inputs for each time step
+    """
+    if T is None:
+        T = 5. * tau_f
+    N = int(np.ceil(T/dt))
+    u_in = u_in + np.zeros(N)
+
+    open_lif_rate = th_lif_fi(u_in[0], tau_m, tref, xt)
+    alif_ss_rate = num_alif_fi(u_in[0], tau_m, tref, xt, af, tau_f)
+
+    ralif_u_in_val = th_ralif_if(alif_ss_rate, tau_m, tref, xt, af)
+    ralif_u_in = ralif_u_in_val + np.zeros(N)
+
     lif_u_in_val = th_lif_if(alif_ss_rate, tau_m, tref, xt)
     lif_u_in = lif_u_in_val + np.zeros(N)
-    
-    alif_spike_times = run_alifsoma(dt, u_in, tau_m, tref, xt, af, tau_f)
-    t, alif_obs_rates = filter_spikes(dt, T, alif_spike_times, tau_obs, ret_time=True)
-    alif_pstc_rates = filter_spikes(dt, T, alif_spike_times, tau_syn, ret_time=False)
-    
-    lif_spike_times = run_lifsoma(dt, lif_u_in, tau_m, tref, xt)
-    lif_obs_rates = filter_spikes(dt, T, lif_spike_times, tau_obs, ret_time=False)
-    lif_pstc_rates = filter_spikes(dt, T, lif_spike_times, tau_syn, ret_time=False)
-    
-    ralif_rates = run_ralifsoma(dt, u_in, tau_m, tref, xt, af, tau_f, f0=alif_ss_rate, u0=u_in[0])
-    ralif_obs_rates = filt(ralif_rates, tau_obs, dt)
-    ralif_pstc_rates = filt(ralif_rates, tau_syn, dt)
-    
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(16, 6))
-    ax1.axhline(alif_ss_rate, c='k', alpha=.4)
-    ax1.axhline(ralif_ss_rate, c='k', alpha=.4)
-    ax2.axhline(alif_ss_rate, c='k', alpha=.4)
-    ax2.axhline(ralif_ss_rate, c='k', alpha=.4)
 
-    ax1.plot(t, alif_obs_rates, 'r', alpha=.9, label='aLIF')
-    ax1.plot(t, ralif_obs_rates, 'r:', alpha=1., label='raLIF')
-    ax1.plot(t, lif_obs_rates, 'b', alpha=.7, label='LIF')
-    ax2.plot(t, alif_pstc_rates, 'r', alpha=.9)
-    ax2.plot(t, ralif_pstc_rates, 'r:', alpha=1.)
-    ax2.plot(t, lif_pstc_rates, 'b', alpha=.7)
-    
-    ax2.set_xlabel('time')
-    ax1.legend(loc='upper left', bbox_to_anchor=(1., 1.))
-    ax1.set_title(r'spikes filtered with $\tau_{obs}=%.3f$' % (tau_obs))
-    ax2.set_title(r'spikes filtered with $\tau_{syn}=%.3f$' % (tau_syn))
-    fig.suptitle(r'$u_{in}=%.2f$ $\tau_f=%.3f$' % (u_in_val, tau_f), fontsize=16)
-    fig.subplots_adjust(top=.85)
+    alif_spike_times = run_alifsoma(
+        dt, u_in, tau_m, tref, xt, af, tau_f)
+    t, alif_rates = filter_spikes(
+        dt, T, alif_spike_times, tau_syn, ret_time=True)
+
+    lif_spike_times = run_lifsoma(
+        dt, lif_u_in, tau_m, tref, xt)
+    lif_rates = filter_spikes(
+        dt, T, lif_spike_times, tau_syn, ret_time=False)
+
+    ralif_rates = run_ralifsoma(
+        dt, ralif_u_in, tau_m, tref, xt, af, tau_f,
+        f0=open_lif_rate, u0=ralif_u_in[0])
+    ralif_rates = filt(ralif_rates, tau_syn, dt)
+
+    ylabel_str = r'$x_{syn}$'
+    if normalize:
+        ralif_rates /= alif_ss_rate
+        alif_rates /= alif_ss_rate
+        lif_rates /= alif_ss_rate
+        alif_ss_rate = 1.
+        ylabel_str = r'$x_{syn}/\langle x_{syn, ss}\rangle$'
+
+    alif_tspk0 = alif_spike_times[0]
+    idx0 = np.argmax(t > alif_tspk0)-1
+    fig, ax = plt.subplots(figsize=(16, 3))
+    ax.axhline(alif_ss_rate, ls=':', c='k', alpha=.5)
+
+    ax.plot(t[idx0:], ralif_rates[:-idx0], 'k', alpha=1., label='raLIF')
+    ax.plot(t, alif_rates, 'r', alpha=.9, label='aLIF')
+    ax.plot(t, lif_rates, 'b', alpha=.6, label='LIF')
+
+    ax.legend(loc='best')
+    ax.set_xlabel(r'$t$', fontsize=20)
+    ax.set_ylabel(ylabel_str, fontsize=20)
+    title_str = (r'$u_{in}=%.2f$ $\tau_f=%.3f$ $\tau_{syn}=%.3f$' %
+                 (u_in[0], tau_f, tau_syn))
+    if tau_f == tau_syn:
+        title_str = (r'$u_{in}=%.2f$ $\tau_f=\tau_{syn}=%.3f$' %
+                     (u_in[0], tau_f))
+    ax.set_title(title_str, fontsize=20, y=1.05)
+    return fig, ax

@@ -41,9 +41,9 @@ def make_uniform_spikes(rate, nspikes, rng=np.random):
     return spike_times
 
 
-def filter_spikes(dt, duration, spike_times, tau, ret_time=True):
+def filter_spikes(dt, duration, spike_times, tau, x0=0., ret_time=True):
     """Filters spikes with a synapse (first order low-pass filter)
-    
+
     Assumes bins small enough that rounding spike times doesn't matter
 
     Parameters
@@ -62,9 +62,13 @@ def filter_spikes(dt, duration, spike_times, tau, ret_time=True):
     nbins = int(np.ceil(duration/dt))
     time = np.arange(nbins)*dt
     state = np.zeros(nbins)
+    state[0] = x0
 
     if spike_times.size == 0:
-        return time, state
+        if ret_time:
+            return time, state
+        else:
+            return state
 
     assert isinstance(spike_times[0], (int, float))
 
