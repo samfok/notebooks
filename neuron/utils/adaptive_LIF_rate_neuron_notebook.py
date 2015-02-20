@@ -7,6 +7,7 @@ from neuron import (
 from plot import make_blue_cmap, make_red_cmap, make_color_cycle
 from signal import filter_spikes
 from nengo.synapses import filt
+from data import scalar_to_array
 
 
 def phase_u_f(tau_m, tref, xt, af, tau_f, dt=1e-4, max_u=5., u_in=3.5,
@@ -98,8 +99,8 @@ def u_in_traj(u_in, tau_m, tref, xt, af, tau_f,
         u0 = u_in
     if f0 is None:
         f0 = th_lif_fi(u0, tau_m, tref, xt)
-    n_steps = int(np.ceil(T/dt))
-    u_in = u_in * np.ones(n_steps)
+    N = int(np.ceil(T/dt))
+    u_in = u_in * np.ones(N)
     f, u_net = run_ralifsoma(
         dt, u_in, tau_m, tref, xt, af, tau_f, f0, u0, ret_u=True)
     return f, u_net
@@ -116,15 +117,15 @@ def u_in_gain(tau_m, tref, xt, af):
     """Computes relative gain between open and closed loop tuning curves"""
     max_u = 5.
     u_in = np.array(
-        [0.] + np.logspace(np.log10(xt), np.log10(2.*xt), 20).tolist() +
-        np.linspace(2.*xt, max_u, 10).tolist())
+        [0.] + np.logspace(np.log10(xt), np.log10(1.5*xt), 30).tolist() +
+        np.linspace(1.5*xt, max_u, 10).tolist())
     idx = u_in > xt
     fig, ax_f = plt.subplots(figsize=(8, 6))
     ax_g = ax_f.twinx()
     title_str = r'$\tau_m=%.3f$ $t_{ref}=%.3f$ ' % (tau_m, tref)
 
     f_open = th_lif_fi(u_in, tau_m, tref, xt)
-    open_line, = ax_f.plot(u_in, f_open, 'k', lw=2)
+    oline, = ax_f.plot(u_in, f_open, 'k', lw=2)
 
     if isinstance(af, (list, np.ndarray)):
         assert isinstance(af, (list, np.ndarray))
@@ -143,9 +144,10 @@ def u_in_gain(tau_m, tref, xt, af):
         gain = np.zeros_like(u_in)
         gain[idx] = f_open[idx] / f_closed[idx]
         label_str = r'$\alpha_f=%.2f$' % (af_val)
-        ax_f.plot(u_in, f_closed, c=cc_b[i], alpha=.7, label=label_str)
-        ax_g.semilogy(u_in[idx], gain[idx],
-                      c=cc_r[i], alpha=.7, label=label_str)
+        cline, = ax_f.plot(
+            u_in, f_closed, c=cc_b[i], alpha=.7, label=label_str)
+        gline, = ax_g.semilogy(u_in[idx], gain[idx],
+                               c=cc_r[i], alpha=.7, label=label_str)
 
     try:
         ax_f.set_ylim(0, 1./tref)
@@ -154,17 +156,19 @@ def u_in_gain(tau_m, tref, xt, af):
     ax_f.set_xlabel(r'$u_{in}$', fontsize=20)
     ax_f.set_ylabel(r'$f$', fontsize=20, rotation=0)
     ax_g.set_ylabel(r'$A$', fontsize=20, rotation=0)
-    fopen_legend = plt.legend((open_line,), ('LIF',), loc='lower left')
-    ax_f.add_artist(fopen_legend)
     if n == 1:
         title_str += label_str
+        fopen_legend = plt.legend(
+            (oline, cline, gline), ('LIF', 'raLIF', r'$A$'), loc='lower left')
     else:
         ax_f.legend(loc='upper right', bbox_to_anchor=(.7, 1.))
         ax_g.legend(loc='upper left', bbox_to_anchor=(.7, 1.))
+        fopen_legend = plt.legend((oline,), ('LIF',), loc='lower left')
+    ax_f.add_artist(fopen_legend)
     ax_f.set_title(title_str, fontsize=14)
 
 
-def rate_v_spiking(u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
+def rate_v_spiking(alif_u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
                    normalize=False):
     """Compares the raLIF aLIF, and LIF soma outputs
 
@@ -173,13 +177,13 @@ def rate_v_spiking(u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
 
     Parameters
     ----------
-    u_in : array-like (m x n)
+    alif_u_in : array-like (m x n)
         inputs for each time step
     """
     if T is None:
         T = 5. * tau_f
     N = int(np.ceil(T/dt))
-    u_in = u_in + np.zeros(N)
+    u_in = alif_u_in + np.zeros(N)
 
     open_lif_rate = th_lif_fi(u_in[0], tau_m, tref, xt)
     alif_ss_rate = num_alif_fi(u_in[0], tau_m, tref, xt, af, tau_f)
@@ -225,10 +229,47 @@ def rate_v_spiking(u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
     ax.legend(loc='best')
     ax.set_xlabel(r'$t$', fontsize=20)
     ax.set_ylabel(ylabel_str, fontsize=20)
-    title_str = (r'$u_{in}=%.2f$ $\tau_f=%.3f$ $\tau_{syn}=%.3f$' %
-                 (u_in[0], tau_f, tau_syn))
-    if tau_f == tau_syn:
-        title_str = (r'$u_{in}=%.2f$ $\tau_f=\tau_{syn}=%.3f$' %
-                     (u_in[0], tau_f))
+    title_str = (r'$u_{in}=%.2f,%.2f,%.2f$ (aLIF, raLIF, LIF), ' %
+                 (u_in[0], ralif_u_in[0], lif_u_in[0], ))
+    if tau_f != tau_syn:
+        title_str += r'$\tau_f=%.3f$, $\tau_{syn}=%.3f$' % (tau_f, tau_syn)
+    else:
+        title_str += r'$\tau_f=\tau_{syn}=%.3f$' % (tau_syn)
     ax.set_title(title_str, fontsize=20, y=1.05)
+    return fig, ax
+
+
+def f_traj(u_ins, tau_m, tref, xt, af, tau_f, dt=1e-4, T=None,
+           normalizey=False):
+    """Simulates an trajectory of the ralif rates"""
+    u_ins = scalar_to_array(u_ins)
+    if T is None:
+        T = 3.*tau_f
+    N = int(np.ceil(T/dt))
+    t = np.arange(N) * dt
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    rcmap = make_red_cmap()
+    cc = make_color_cycle(np.arange(len(u_ins)), rcmap)
+    lines = []
+    for idx, u_in_val in enumerate(u_ins):
+        u_in = u_in_val + np.zeros(N)
+        u0 = u_in_val
+        f0 = th_lif_fi(u_in_val, tau_m, tref, xt)
+        f, _ = u_in_traj(u_in, tau_m, tref, xt, af, tau_f, dt, T, u0, f0)
+
+        if normalizey:
+            fss = num_ralif_fi(u_in_val, tau_m, tref, xt, af)
+            f /= fss
+        lines.append(ax.plot(
+            t/tau_f, f, c=cc[idx], label=r'$u_{in}=%.2f$' % u_in_val)[0])
+    ax.legend(
+        handles=lines[::-1], loc='upper left', bbox_to_anchor=(1.01, 1.02))
+    ax.set_xlabel(r'$t/\tau_f$', fontsize=20)
+    if normalizey:
+        ylabel_str = r'$f/f_{ss}$'
+        ax.set_ylim(1., ax.get_ylim()[1])
+    else:
+        ylabel_str = r'$f$'
+    ax.set_ylabel(ylabel_str, fontsize=20)
     return fig, ax
