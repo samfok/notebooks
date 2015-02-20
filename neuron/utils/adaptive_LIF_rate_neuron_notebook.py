@@ -161,10 +161,11 @@ def u_in_gain(tau_m, tref, xt, af):
         fopen_legend = plt.legend(
             (oline, cline, gline), ('LIF', 'raLIF', r'$A$'), loc='lower left')
     else:
-        ax_f.legend(loc='upper right', bbox_to_anchor=(.7, 1.))
-        ax_g.legend(loc='upper left', bbox_to_anchor=(.7, 1.))
         fopen_legend = plt.legend((oline,), ('LIF',), loc='lower left')
     ax_f.add_artist(fopen_legend)
+    if n > 1:
+        ax_f.legend(loc='upper right', bbox_to_anchor=(.7, 1.))
+        ax_g.legend(loc='upper left', bbox_to_anchor=(.7, 1.))
     ax_f.set_title(title_str, fontsize=14)
 
 
