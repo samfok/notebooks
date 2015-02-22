@@ -223,8 +223,8 @@ def rate_v_spiking(alif_u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
     fig, ax = plt.subplots(figsize=(16, 3))
     ax.axhline(alif_ss_rate, ls=':', c='k', alpha=.5)
 
-    ax.plot(t[idx0:], ralif_rates[:-idx0], 'k', alpha=1., label='raLIF')
-    ax.plot(t, alif_rates, 'r', alpha=.9, label='aLIF')
+    ax.plot(t[idx0:], ralif_rates[:-idx0], 'r', alpha=1., label='raLIF')
+    ax.plot(t, alif_rates, 'k', alpha=.6, label='aLIF')
     ax.plot(t, lif_rates, 'b', alpha=.6, label='LIF')
 
     ax.legend(loc='best')
@@ -240,37 +240,102 @@ def rate_v_spiking(alif_u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
     return fig, ax
 
 
+def syn_out(t, dfdt, tau_syn, f0, fss):
+    tss = (fss - f0) / dfdt
+    hf = np.zeros_like(t)
+    def tran(t, dfdt, tau_syn, f0):
+        return dfdt * t + (f0 - dfdt * tau_syn) * (1-np.exp(-t/tau_syn))
+    idx = t <= tss
+    hf[idx] = tran(t[idx], dfdt, tau_syn, f0)
+    hf_tss = tran(tss, dfdt, tau_syn, f0)
+    idx = t > tss
+    hf[idx] = (fss*(1-np.exp(-(t[idx]-tss)/tau_syn)) +
+               hf_tss*np.exp(-(t[idx]-tss)/tau_syn))
+    return hf
+
+
 def f_traj(u_ins, tau_m, tref, xt, af, tau_f, dt=1e-4, T=None,
-           normalizey=False):
-    """Simulates an trajectory of the ralif rates"""
+           tau_syn=None, normalize_y=False):
+    """Simulates an trajectory of the ralif rates
+
+    Parameters
+    ----------
+    tau_syn : float (optional)
+        if passed in, also computes and shows filtered rates
+    normalize_y : bool (optional)
+        Normalize the output rates (y-axis) to the steady-state rates
+    """
     u_ins = scalar_to_array(u_ins)
+    N_u_in = len(u_ins)
     if T is None:
         T = 3.*tau_f
     N = int(np.ceil(T/dt))
     t = np.arange(N) * dt
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    rcmap = make_red_cmap()
-    cc = make_color_cycle(np.arange(len(u_ins)), rcmap)
+    rcmap = make_red_cmap(1., 0.)
+    bcmap = make_blue_cmap(1., 0.)
+    rcc = make_color_cycle(np.arange(N_u_in), rcmap)
+    bcc = make_color_cycle(np.arange(N_u_in), bcmap)
     lines = []
     for idx, u_in_val in enumerate(u_ins):
         u_in = u_in_val + np.zeros(N)
         u0 = u_in_val
         f0 = th_lif_fi(u_in_val, tau_m, tref, xt)
+        fss = num_ralif_fi(u_in_val, tau_m, tref, xt, af)
         f, _ = u_in_traj(u_in, tau_m, tref, xt, af, tau_f, dt, T, u0, f0)
+        tau = tau_f / (tau_m*xt) * (u0*(u0 - xt))
+        dfdt0 = -af * f0**3 / tau
+        f_est = dfdt0 * t + f0
+        f_est[f_est < fss] = fss
 
-        if normalizey:
-            fss = num_ralif_fi(u_in_val, tau_m, tref, xt, af)
+        if normalize_y:
             f /= fss
+            f_est /= fss
+
         lines.append(ax.plot(
-            t/tau_f, f, c=cc[idx], label=r'$u_{in}=%.2f$' % u_in_val)[0])
-    ax.legend(
-        handles=lines[::-1], loc='upper left', bbox_to_anchor=(1.01, 1.02))
+            t/tau_f, f, c=rcc[idx], label='rate')[0])
+        ax.plot(t/tau_f, f_est, c=rcc[idx], alpha=.5, label='piecewise rate')
+        if normalize_y:
+            ax.axhline(1, c='k', ls=':', alpha=.5)
+        else:
+            ax.axhline(fss, c='k', ls=':', alpha=.5)
+
+        if tau_syn is not None:
+            hf = np.zeros(N)
+
+            hf[1:] = filt(f[:-1], tau_syn, dt)
+            hf_est = syn_out(t, dfdt0, tau_syn, f0, fss)
+            hfss = fss * (1 - np.exp(-t/tau_syn))
+
+            if normalize_y:
+                hf_est /= fss
+                hfss /= fss
+
+            ax.plot(t/tau_f, hf, c='b', label='filtered rate')
+            ax.plot(t/tau_f, hf_est, c='b', alpha=.5,
+                    label='filtered piecewise rate')
+            ax.plot(t/tau_f, hfss, c='b', ls=':', alpha=.5,
+                    label='filtered steady state rate')
+
+    title_str = r'$\tau_m=%.3f$  $t_{ref}=%.3f$  $\alpha_f=%.3f$  ' % (
+        tau_m, tref, af)
+    if tau_syn:
+        title_str += r'$\tau_{syn}/\tau_f=%.3f$  ' % (tau_syn/tau_f)
+    if N_u_in > 1:
+        ax.legend(
+            lines[::-1], [r'$u_{in}=%.3f$' % u for u in u_ins[::-1]],
+            loc='upper left', bbox_to_anchor=(1.01, 1.02))
+    else:
+        title_str += r'$u_{in}=%.3f$  ' % (u_ins)
+        ax.legend(loc ='upper right')
     ax.set_xlabel(r'$t/\tau_f$', fontsize=20)
-    if normalizey:
+    if normalize_y:
         ylabel_str = r'$f/f_{ss}$'
-        ax.set_ylim(1., ax.get_ylim()[1])
+        if tau_syn is None:
+            ax.set_ylim(1., ax.get_ylim()[1])
     else:
         ylabel_str = r'$f$'
     ax.set_ylabel(ylabel_str, fontsize=20)
+    ax.set_title(title_str, fontsize=18)
     return fig, ax
