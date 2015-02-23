@@ -45,16 +45,17 @@ def phase_u_f(tau_m, tref, xt, af, tau_f, dt=1e-4, max_u=5., u_in=3.5,
 
     bcmap = make_blue_cmap()
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(_u, _f, 'k')
+    ax.plot(_u, _f, 'k', label=r'$f_{open}$')
     ax.quiver(U, F, dUdt, dFdt, dFdt, angles='xy', scale_units='xy',
               pivot='middle', cmap=bcmap, alpha=.7)
-    ax.plot(_u, f_ss, 'c')
+    ax.plot(_u, f_ss, 'c', label=r'$f=\frac{u_{in}-u_{net}}{\alpha_f}$')
     ax.plot(num_u, num_f, 'co')
 
     ax.set_xlim(0, max_u)
     ax.set_ylim(0, 1./tref)
     ax.set_xlabel(r'$u_{net}$', fontsize=20)
     ax.set_ylabel(r'$f$', fontsize=20)
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1.025), fontsize=18)
 
     if show:
         plt.show()
@@ -243,6 +244,7 @@ def rate_v_spiking(alif_u_in, tau_m, tref, xt, af, tau_f, tau_syn, dt, T=None,
 def syn_out(t, dfdt, tau_syn, f0, fss):
     tss = (fss - f0) / dfdt
     hf = np.zeros_like(t)
+
     def tran(t, dfdt, tau_syn, f0):
         return dfdt * t + (f0 - dfdt * tau_syn) * (1-np.exp(-t/tau_syn))
     idx = t <= tss
@@ -312,10 +314,10 @@ def f_traj(u_ins, tau_m, tref, xt, af, tau_f, dt=1e-4, T=None,
                 hf_est /= fss
                 hfss /= fss
 
-            ax.plot(t/tau_f, hf, c='b', label='filtered rate')
-            ax.plot(t/tau_f, hf_est, c='b', alpha=.5,
+            ax.plot(t/tau_f, hf, c=bcc[idx], label='filtered rate')
+            ax.plot(t/tau_f, hf_est, c=bcc[idx], alpha=.5,
                     label='filtered piecewise rate')
-            ax.plot(t/tau_f, hfss, c='b', ls=':', alpha=.5,
+            ax.plot(t/tau_f, hfss, c=bcc[idx], ls=':', alpha=.5,
                     label='filtered steady state rate')
 
     title_str = r'$\tau_m=%.3f$  $t_{ref}=%.3f$  $\alpha_f=%.3f$  ' % (
@@ -328,7 +330,7 @@ def f_traj(u_ins, tau_m, tref, xt, af, tau_f, dt=1e-4, T=None,
             loc='upper left', bbox_to_anchor=(1.01, 1.02))
     else:
         title_str += r'$u_{in}=%.3f$  ' % (u_ins)
-        ax.legend(loc ='upper right')
+        ax.legend(loc='upper right')
     ax.set_xlabel(r'$t/\tau_f$', fontsize=20)
     if normalize_y:
         ylabel_str = r'$f/f_{ss}$'
