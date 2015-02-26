@@ -33,6 +33,8 @@ def make_blue_cmap(low=0., high=1., name='blue'):
 
 def make_color_cycle(values, cmap):
     """Generates a list of colors from a colormap cmap for values"""
+    if isinstance(values, int):
+        values = [i for i in xrange(values)]
     cNorm = colors.Normalize(vmin=min(values), vmax=max(values))
     scalarMap = mcm.ScalarMappable(norm=cNorm, cmap=cmap)
     color_cycle = [scalarMap.to_rgba(value) for value in values]
