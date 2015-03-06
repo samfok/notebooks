@@ -28,17 +28,18 @@ def build_chain(N_ens=4, conn_syn=.01, probe_syn=.01, N_neurons=100,
     net.cp = []  # connection probe
     net.sp = []  # spike probe
     with net:
+        net.stim = nengo.Node(None, size_in=1)
         for i in xrange(N_ens):
             net.e.append(nengo.Ensemble(N_neurons, 1, radius=1., seed=1))
             net.p.append(nengo.Probe(net.e[-1], synapse=probe_syn[i]))
             if probe_spikes:
                 net.sp.append(nengo.Probe(net.e[-1].neurons, 'spikes'))
+        stim_conn = nengo.Connection(net.stim, net.e[0], synapse=None)
+        net.cp.append(nengo.Probe(stim_conn, synapse=None))
         for i in xrange(N_ens-1):
             net.c.append(
                 nengo.Connection(net.e[i], net.e[i+1], synapse=conn_syn[i]))
             net.cp.append(nengo.Probe(net.c[-1], synapse=None))
-        net.stim = nengo.Node(None, size_in=1)
-        nengo.Connection(net.stim, net.e[0], synapse=None)
     return net
 
 
@@ -54,11 +55,12 @@ def run_chain_exp(T, N_ens, conn_syn=.01, probe_syn=.01, N_neurons=100,
     return net, sim
 
 
-def plot_decode_input(N_ens, net, sim):
+def plot_decode_input(net, sim):
     """Plots the decode and connection inputs of a chain of Ensembles"""
+    N_ens = len(net.e)
     t = sim.trange()
     bcc = make_color_cycle(N_ens, make_blue_cmap(1., 0.))
-    rcc = make_color_cycle(N_ens-1, make_red_cmap(1., 0.))
+    rcc = make_color_cycle(N_ens, make_red_cmap(1., 0.))
     fig, axs = plt.subplots(ncols=2, sharex=True, figsize=(12, 4))
     for p_idx, p in enumerate(net.p):
         axs[0].plot(t, sim.data[p], c=bcc[p_idx], alpha=.7)
