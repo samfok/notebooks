@@ -88,7 +88,7 @@ def _th_lif_dfdu(u, f, tau, tref, xt, out):
     return out
 
 
-def th_lif_dfdu(u, tau, tref, xt, out=None):
+def th_lif_dfdu(u, tau, tref, xt, f=None, out=None):
     """Derivative of the LIF firing rate with respect to the input
 
     Parameters
@@ -101,10 +101,13 @@ def th_lif_dfdu(u, tau, tref, xt, out=None):
         refractory period
     xt : float
         threshold
+    f : array_like of floats (optional)
+        firing rate about which to compute the derivative
     out : array-like (optional)
     """
     u = scalar_to_array(u)
-    f = th_lif_fi(u, tau, tref, xt)
+    if f is None:
+        f = th_lif_fi(u, tau, tref, xt)
     dfdu = out
     if dfdu is None:
         dfdu = np.zeros_like(u)
@@ -145,6 +148,24 @@ def th_ralif_if(f, tau_m, tref, xt, af):
     u_f = af * f
     u_in = u_net + u_f
     return u_in
+
+
+def th_ralif_dudt(u_net, u_in, f, af, tau_f):
+    """Derivative of the raLIF net input with respect to time"""
+    dudt = 1./tau_f * (-u_net + u_in - af*f)
+    return dudt
+
+
+def th_ralif_dfdt(u_net, u_in, f, tau_m, tref, xt, af, tau_f, ret_dudt=False):
+    """Derivative of the raLIF firing rate with respect to time"""
+    dudt = th_ralif_dudt(u_net, u_in, f, af, tau_f)
+    dfdu = th_lif_dfdu(u_net, tau_m, tref, xt, f=f)
+    # import pdb; pdb.set_trace()
+    dfdt = dfdu * dudt
+    if ret_dudt:
+        return dfdt, dudt
+    else:
+        return dfdt
 
 
 def th_usyn_xmin(lam, tau):
@@ -709,7 +730,6 @@ def run_ralifsoma(dt, u_in, tau_m, tref, xt, af=1e-2, tau_f=1e-2,
         u_in.shape = u_in.shape[0], 1
 
     f = np.zeros_like(u_in)
-    dfdu = np.zeros(u_in.shape[1])
     u = np.zeros_like(u_in)
     f[0, :] = f0
     if u0 is None:
@@ -718,9 +738,8 @@ def run_ralifsoma(dt, u_in, tau_m, tref, xt, af=1e-2, tau_f=1e-2,
     else:
         u[0, :] = u0
     for i in xrange(1, nsteps):
-        dudt = 1./tau_f * (-u[i-1, :] + u_in[i-1, :] - af*f[i-1, :])
-        dfdu = th_lif_dfdu(u[i-1, :], tau_m, tref, xt, dfdu)
-        dfdt = dfdu * dudt
+        dfdt, dudt = th_ralif_dfdt(u[i-1, :], u_in[i-1, :], f[i-1, :],
+                                   tau_m, tref, xt, af, tau_f, ret_dudt=True)
         u[i, :] = u[i-1, :] + dudt * dt
         f[i, :] = f[i-1, :] + dfdt * dt
 

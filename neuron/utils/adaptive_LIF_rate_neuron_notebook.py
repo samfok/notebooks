@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import eigvals
 from matplotlib import pyplot as plt
 from neuron import (
     th_lif_fi, th_lif_if, th_lif_dfdu, th_ralif_if,
