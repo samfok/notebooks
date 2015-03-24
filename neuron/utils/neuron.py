@@ -160,7 +160,6 @@ def th_ralif_dfdt(u_net, u_in, f, tau_m, tref, xt, af, tau_f, ret_dudt=False):
     """Derivative of the raLIF firing rate with respect to time"""
     dudt = th_ralif_dudt(u_net, u_in, f, af, tau_f)
     dfdu = th_lif_dfdu(u_net, tau_m, tref, xt, f=f)
-    # import pdb; pdb.set_trace()
     dfdt = dfdu * dudt
     if ret_dudt:
         return dfdt, dudt

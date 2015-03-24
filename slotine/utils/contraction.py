@@ -54,8 +54,8 @@ def plot_contraction(delta_x, dfdx, dt):
     for i in xrange(N):
         dx = delta_x[i].reshape((2, 1))
         ddist_sq_th[i] = 2.*dx.T.dot(dfdx).dot(dx)
-        ddist_sq_ub[i] = 2.*evals[0]*dx.T.dot(dx)
-        ddist_sq_lb[i] = 2.*evals[1]*dx.T.dot(dx)
+        ddist_sq_ub[i] = 2.*evals[1]*dx.T.dot(dx)
+        ddist_sq_lb[i] = 2.*evals[0]*dx.T.dot(dx)
     ddist_sq_num = np.diff(dist_sq)/dt
     dx0 = delta_x[0]
     dist_sq_ub = dx0.dot(dx0)*np.exp(2.*evals[1]*t)
@@ -69,8 +69,8 @@ def plot_contraction(delta_x, dfdx, dt):
     ax1.set_xlabel(r'$t$', fontsize=16)
     ax1.set_title(r'$\delta\mathbf{x}^T\delta\mathbf{x}$', fontsize=16)
 
+    ax2.plot(t[1:], ddist_sq_num, 'r', lw=1, label='observed')
     ax2.plot(t, ddist_sq_th, 'g', lw=2, label='theory')
-    ax2.plot(t[1:], ddist_sq_num, 'r', lw=1, label='numerical')
     ax2.plot(t, ddist_sq_lb, 'b', label='theory lower bound')
     ax2.plot(t, ddist_sq_ub, 'k', label='theory upper bound')
     ax2.legend(loc='center right')

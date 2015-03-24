@@ -1,8 +1,7 @@
 import numpy as np
-from numpy.linalg import eigvals
 from matplotlib import pyplot as plt
 from neuron import (
-    th_lif_fi, th_lif_if, th_lif_dfdu, th_ralif_if,
+    th_lif_fi, th_lif_if, th_lif_dfdu, th_ralif_if, th_ralif_dfdt,
     num_alif_fi, num_ralif_fi, run_ralifsoma,
     run_lifsoma, run_alifsoma)
 from plot import make_blue_cmap, make_red_cmap, make_color_cycle
@@ -342,3 +341,296 @@ def f_traj(u_ins, tau_m, tref, xt, af, tau_f, dt=1e-4, T=None,
     ax.set_ylabel(ylabel_str, fontsize=20)
     ax.set_title(title_str, fontsize=18)
     return fig, ax
+
+
+# Jacobian analysis
+def _J11(u_in, u_net, f, tau_m, xt, af, tau_f):
+    num = f*(2.*u_in - 3.*af*f - 2.*u_net)
+    den = u_net*(-xt+u_net)
+    ret = tau_m*xt/tau_f * num / den
+    return ret
+
+
+def _J12(u_in, u_net, f, tau_m, xt, af, tau_f):
+    num = f**2.*(u_in*(xt-2.*u_net) + u_net**2. - af*f*(xt-2.*u_net))
+    den = u_net**2.*(-xt+u_net)**2
+    ret = tau_m*xt/tau_f * num / den
+    return ret
+
+
+def _J21(af, tau_f):
+    return -af/tau_f
+
+
+def _J22(tau_f):
+    return -1./tau_f
+
+
+def J_ralif(u_in, u_net, f, tau_m, xt, af, tau_f):
+    ret = np.array([
+        [_J11(u_in, u_net, f, tau_m, xt, af, tau_f),
+         _J12(u_in, u_net, f, tau_m, xt, af, tau_f)],
+        [_J21(af, tau_f), _J22(tau_f)]])
+    return ret
+
+
+def _f1(u_in, u_net, f, tau_m, xt, af, tau_f):
+    num = f**2 * (u_in - af*f - u_net)
+    den = u_net * (-xt + u_net)
+    ret = tau_m*xt/tau_f*num/den
+    return ret
+
+
+def _f2(u_in, u_net, f, af, tau_f):
+    ret = (u_in - af*f - u_net)/tau_f
+    return ret
+
+
+def rel_diff(x, x_ref):
+    return (x-x_ref)/x_ref
+
+
+def grad_check(fun, gradfun, x0, h=1e-5):
+    yph = fun(x0+h)
+    ymh = fun(x0-h)
+    grad_num = (yph-ymh)/(2.*h)
+    grad_th = gradfun(x0)
+    return rel_diff(grad_num, grad_th)
+
+
+def gradcheck_J(u_in, u_net, f, tau_m, xt, af, tau_f):
+    f1_f = lambda x: _f1(u_in, u_net, x, tau_m, xt, af, tau_f)
+    f1_u_net = lambda x: _f1(u_in, x, f, tau_m, xt, af, tau_f)
+    f2_f = lambda x: _f2(u_in, u_net, x, af, tau_f)
+    f2_u_net = lambda x: _f2(u_in, x, f, af, tau_f)
+
+    J11_f = lambda x: _J11(u_in, u_net, x, tau_m, xt, af, tau_f)
+    J12_u_net = lambda x: _J12(u_in, x, f, tau_m, xt, af, tau_f)
+    J21_f = lambda x: _J21(af, tau_f)
+    J22_u_net = lambda x: _J22(tau_f)
+
+    print grad_check(f1_f, J11_f, f)
+    print grad_check(f1_u_net, J12_u_net, u_net)
+    print grad_check(f2_f, J21_f, f)
+    print grad_check(f2_u_net, J22_u_net, u_net)
+
+
+def plotcheck_J(tau_m, tref, xt, af, tau_f, dt, u_in=3.5):
+    fig, axs = plt.subplots(
+        nrows=4, ncols=2, gridspec_kw={'wspace': .3, 'hspace': .5},
+        figsize=(14, 12))
+
+    u_net = u_in
+    x1, dx1 = np.linspace(5., .95/tref, 200, retstep=True)
+    f1 = th_ralif_dfdt(u_net, u_in, x1, tau_m, tref, xt, af, tau_f)
+    df1dx1 = _J11(u_in, u_net, x1, tau_m, xt, af, tau_f)
+    df1dx1_num = np.diff(f1) / dx1
+
+    axs[0, 0].plot(x1, f1)
+    axs[1, 0].plot(x1, df1dx1, label='theory')
+    axs[1, 0].plot(x1[1:], df1dx1_num, 'r', label='numerical')
+    axs[1, 0].legend(loc='best')
+    axs[1, 0].set_xlabel(r'$f$', fontsize=16)
+    axs[0, 0].set_ylabel(r'$f_1$', fontsize=16)
+    axs[1, 0].set_ylabel(r'$\frac{\partial f_1}{\partial{f}}$',
+                         fontsize=20)
+
+    f = num_ralif_fi(u_in, tau_m, tref, xt, af)
+    x2, dx2 = np.linspace(1.1*xt, 5, 200, retstep=True)
+    f1 = th_ralif_dfdt(x2, u_in, f, tau_m, tref, xt, af, tau_f)
+
+    df1dx2 = _J12(u_in, x2, f, tau_m, xt, af, tau_f)
+    df1dx2_num = np.diff(f1) / dx2
+
+    axs[0, 1].plot(x2, f1)
+    axs[1, 1].plot(x2, df1dx2, label='theory')
+    axs[1, 1].plot(x2[1:], df1dx2_num, 'r', label='numerical')
+    axs[1, 1].legend(loc='best')
+    axs[1, 1].set_xlabel(r'$u_{net}$', fontsize=16)
+    axs[0, 1].set_ylabel(r'$f_1$', fontsize=16)
+    axs[1, 1].set_ylabel(r'$\frac{\partial f_1}{\partial{u_{net}}}$',
+                         fontsize=20)
+
+    f2 = _f2(u_in, u_net, x1, af, tau_f)
+    df2dx1 = np.ones(len(x1)) * _J21(af, tau_f)
+    df2dx1_num = np.diff(f2) / dx1
+
+    axs[2, 0].plot(x1, f2)
+    axs[3, 0].plot(x1, df2dx1, label='theory')
+    axs[3, 0].plot(x1[1:], df2dx1_num, 'r', label='numerical')
+    axs[3, 0].set_ylim(-2*af/tau_f, 0)
+    axs[3, 0].legend(loc='best')
+    axs[3, 0].set_xlabel(r'$f$', fontsize=16)
+    axs[2, 0].set_ylabel(r'$f_2$', fontsize=16)
+    axs[3, 0].set_ylabel(r'$\frac{\partial f_2}{\partial{f}}$',
+                         fontsize=20)
+
+    f2 = _f2(u_in, x2, f, af, tau_f)
+    df2dx2 = np.ones(len(x2)) * _J22(tau_f)
+    df2dx2_num = np.diff(f2) / dx2
+
+    axs[2, 1].plot(x2, f2)
+    axs[3, 1].plot(x2, df2dx2, label='theory')
+    axs[3, 1].plot(x2[1:], df2dx2_num, 'r', label='numerical')
+    axs[3, 1].set_ylim(-2./tau_f, 0)
+    axs[3, 1].legend(loc='best')
+    axs[3, 1].set_xlabel(r'$u_{net}$', fontsize=16)
+    axs[2, 1].set_ylabel(r'$f_2$', fontsize=16)
+    axs[3, 1].set_ylabel(r'$\frac{\partial f_2}{\partial{u_{net}}}$',
+                         fontsize=20)
+
+
+def contraction_analysis(u_in, tau_m, tref, xt, af, tau_f, dt=1e-4):
+    T = 3.*tau_f
+    u0 = u_in
+    f0 = th_lif_fi(u0, tau_m, tref, xt)
+    f, u_net = u_in_traj(u_in, tau_m, tref, xt, af, tau_f, dt, T, u0, f0)
+    n = len(f)
+    t = np.arange(n)*dt
+
+    f_ss = num_ralif_fi(u_in, tau_m, tref, xt, af)
+    u_net_ss = th_ralif_if(f_ss, tau_m, tref, xt, af)-af*f_ss
+
+    delta = np.zeros((n, 2))
+    delta[:, 0] = f_ss-f
+    delta[:, 1] = u_net_ss-u_net
+    dist_sq = np.zeros(n)
+    ddist_sq = np.zeros(n)
+    ddist_sq_lb = np.zeros(n)
+    ddist_sq_ub = np.zeros(n)
+    evals = np.zeros((n, 2))
+    proj = np.zeros((n, 2))
+    evects = (np.zeros((n, 2)), np.zeros((n, 2)))
+    for i in xrange(n):
+        J = J_ralif(u_in, u_net[i], f[i], tau_m, xt, af, tau_f)
+        J_sym = .5*(J+J.T)
+        lam, v = np.linalg.eigh(J_sym)
+        evals[i, :] = lam
+        evects[0][i, :] = v[:, 0]
+        evects[1][i, :] = v[:, 1]
+        dist_sq[i] = delta[i].dot(delta[i])
+        ddist_sq[i] = 2.*delta[i].dot(J).dot(delta[i])
+        ddist_sq_lb[i] = 2.*lam[0]*delta[i].dot(delta[i])
+        ddist_sq_ub[i] = 2.*lam[1]*delta[i].dot(delta[i])
+        proj[i, :] = v.T.dot(delta[i]).T
+
+        # gradcheck_J(u_in, u_net[i], f[i], tau_m, xt, af, tau_f)
+    ddist_sq_num = np.diff(dist_sq)/dt
+
+    # switch up eigenvalues and vectors after crossover
+    max_idx = np.argmax(evals[:, 0])
+    evals[max_idx:, :] = evals[max_idx:, ::-1]
+    proj[max_idx:, :] = proj[max_idx:, ::-1]
+    __tmp0__ = evects[0][max_idx:, :].copy()
+    __tmp1__ = evects[1][max_idx:, :].copy()
+    evects[0][max_idx:, :] = __tmp1__
+    evects[1][max_idx:, :] = __tmp0__
+
+    retval = dict(
+        t=t, u_net=u_net, f=f, delta=delta,
+        dist_sq=dist_sq, ddist_sq=ddist_sq, ddist_sq_num=ddist_sq_num,
+        ddist_sq_lb=ddist_sq_lb, ddist_sq_ub=ddist_sq_ub,
+        eigenvals=evals, projections=proj, evects=evects)
+    return retval
+
+
+def plot_traj(t, u_net, f, delta, tau_m, tref, xt):
+    fig = plt.figure(figsize=(12, 4))
+    ax = fig.add_subplot(121)
+    u_lif = np.sort(np.linspace(0, 5, 50).tolist() + [xt, 1.01*xt])
+    f_lif = th_lif_fi(u_lif, tau_m, tref, xt)
+    ax.plot(u_lif, f_lif, 'k', label='open loop')
+    ax.plot(u_net, f, 'mo', label=r'$f(u_{net}(t))$')
+    ax.legend(loc='best')
+    ax.set_xlabel(r'$u_{net}$', fontsize=16)
+    ax.set_ylabel(r'$f$', fontsize=16)
+    ax = fig.add_subplot(222)
+    ax.plot(t, delta[:, 0])
+    ax.set_ylabel(r'$\delta x_1$', fontsize=16)
+    ax = fig.add_subplot(224)
+    ax.plot(t, delta[:, 1])
+    ax.set_xlabel(r'$t$', fontsize=16)
+    ax.set_ylabel(r'$\delta x_2$', fontsize=16)
+
+
+def plot_contraction(t, dist_sq,
+                     ddist_sq_num, ddist_sq, ddist_sq_lb, ddist_sq_ub,
+                     eigenvals, projections):
+    # plot deltax deltax
+    fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, figsize=(15, 8))
+    fig.subplots_adjust(hspace=.3)
+    axs[0, 0].plot(t, dist_sq)
+    axs[1, 0].plot(t[1:], ddist_sq_num, 'r', label='observed')
+    axs[1, 0].plot(t, ddist_sq, 'g', lw=2, label='theory')
+    axs[1, 0].plot(t, ddist_sq_lb, 'b', label='theory lower bound')
+    axs[1, 0].plot(t, ddist_sq_ub, 'k', label='theory upper bound')
+    axs[1, 0].axhline(0, c='k', alpha=.2)
+    ylims = 1.1*np.max([max(np.abs(ddist_sq_num)), max(np.abs(ddist_sq))])
+    ylims = (-ylims, ylims)
+    axs[1, 0].set_ylim(ylims)
+    axs[1, 0].legend(loc='lower right')
+    axs[1, 0].set_xlabel(r'$t$', fontsize=16)
+    axs[1, 1].set_xlabel(r'$t$', fontsize=16)
+    axs[0, 0].set_title(r'$\delta\mathbf{x}^T\delta\mathbf{x}$', fontsize=16)
+    axs[1, 0].set_title(r'$\frac{d}{dt}(\delta\mathbf{x}^T\delta\mathbf{x})$',
+                        fontsize=16, y=1.03)
+
+    # plot eigenvalue analysis
+    axs[0, 1].plot(t, eigenvals)
+    axs[1, 1].plot(t, projections)
+    axs[0, 1].axhline(0, c='k')
+    axs[1, 1].axhline(0, c='k')
+    axs[0, 1].set_title(
+        'eigenvalues of ' + r'$\partial\mathbf{f}/\partial\mathbf{x}$',
+        fontsize=16)
+    axs[1, 1].set_title((
+        r'$\delta\mathbf{x}$' + ' projected on to eigenvectors of ' +
+        r'$\partial\mathbf{f}/\partial\mathbf{x}$'), fontsize=16)
+
+
+def plot_components(t, eigenvals, projections, evects):
+    # plot components of ddistsq
+    ddist_sq_components = 2 * projections**2 * eigenvals
+    fig = plt.figure(figsize=(15, 6))
+    ax = fig.add_subplot(121)
+    label1str = (r'$2\lambda_1\delta\mathbf{x}^T\mathbf{v}_1$' +
+                 r'$\mathbf{v}_1^T\delta\mathbf{x}$')
+    ax.plot(t, ddist_sq_components[:, 0], label=label1str)
+    label2str = (r'$2\lambda_2\delta\mathbf{x}^T\mathbf{v}_2$' +
+                 r'$\mathbf{v}_2^T\delta\mathbf{x}$')
+    ax.plot(t, ddist_sq_components[:, 1], label=label2str)
+    labelstr = label1str + r' $+$ ' + label2str
+    ax.plot(t, np.sum(ddist_sq_components, axis=1), label=labelstr)
+    ax.axhline(0, c='k', alpha=.2)
+    ax.legend(loc='upper right')
+    ax.set_xlabel(r'$t$', fontsize=16)
+    titlestr = (
+        'components of ' +
+        r'$2\delta\mathbf{x}$' +
+        r'$\frac{\partial\mathbf{f}}{\partial\mathbf{x}}$' +
+        r'$\delta\mathbf{x}$')
+    ax.set_title(titlestr, fontsize=16, y=1.025)
+    ax = fig.add_subplot(222)
+    ax.plot(t, evects[0][:, ::-1])
+    ax.set_ylabel(r'$\mathbf{v}_1$', fontsize=16)
+    ax.set_title('eigenvector components', fontsize=16)
+    ax = fig.add_subplot(224)
+    ax.plot(t, evects[1][:, ::-1])
+    ax.set_xlabel(r'$t$', fontsize=16)
+    ax.set_ylabel('$\mathbf{v}_2$', fontsize=16)
+
+    # plot eigenvectors onto unit circle
+    th = np.linspace(0, 2*np.pi, 50)
+    x = np.cos(th)
+    y = np.sin(th)
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.plot(x, y, c='k', alpha=.2)
+    ax.plot(evects[0][:, 1], evects[0][:, 0], 'r-o')
+    ax.plot(evects[1][:, 1], evects[1][:, 0], 'b-o')
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.2, 1.2)
+    ax.set_xlabel(r'$x_1$', fontsize=16)
+    ax.set_ylabel(r'$x_2$', fontsize=16)
+    ax.set_title(
+        'eigenvectors of ' + r'$\partial\mathbf{f}/\partial\mathbf{x}$',
+        fontsize=16)
