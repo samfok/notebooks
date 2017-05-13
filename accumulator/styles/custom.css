@@ -1,0 +1,34 @@
+<style>
+.rendered_html tr,
+.rendered_html th,
+.rendered_html td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0.42em 0.47em;
+    line-height: normal;
+    white-space: normal;
+    max-width: none;
+    border: none;
+}
+
+.rendered_html tr,
+.rendered_html td {
+    font-size: 9.3pt !important;
+    color: #353535;
+}
+
+.rendered_html td {
+    border: 1px solid;
+}
+
+.rendered_html table {
+ margin-left: auto;
+ margin-right: auto;
+ border: 1px solid;
+ border-collapse: collapse;
+ border-spacing: 0;
+ font-size: 9.3pt !important;
+ table-layout: fixed;
+}
+</style>
+
