@@ -81,17 +81,23 @@ class Neuron(object):
         assert spike_rate >= 0.
         self.spike_rate = spike_rate
         self.weight = weight
-        self.period = 1./spike_rate
-        if T0 == None:
-            self.T0 = np.random.uniform(0, self.period)
-        else:
-            self.T0 = T0
+        if spike_rate > 0.:
+            self.period = 1./spike_rate
+            if T0 == None:
+                self.T0 = np.random.uniform(0, self.period)
+            else:
+                self.T0 = T0
+
     def generate_spikes(self, T):
         """Generates spikes within a time period T
         """
-        nspikes = int(T/self.period)
-        times = self.period * np.arange(nspikes) + self.T0
-        weights = self.weight * np.ones(nspikes, dtype=int)
+        if self.spike_rate > 0.:
+            nspikes = int(T/self.period)
+            times = self.period * np.arange(nspikes) + self.T0
+            weights = self.weight * np.ones(nspikes, dtype=int)
+        else:
+            times = np.array([])
+            weights = np.array([], dtype=int)
         spikes = SpikeTrain(times, weights)
         return spikes
 
