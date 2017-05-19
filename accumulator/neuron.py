@@ -3,6 +3,9 @@ import numpy as np
 import abc
 from datatypes import SpikeTrain
 
+def assert_xor(x, y, msg=""):
+    assert (x or y) and not (x and y), msg
+
 class Neuron(object):
     """Abstract base neuron class
     """
@@ -21,7 +24,7 @@ class Neuron(object):
         self.weight = weight
 
     @abc.abstractmethod
-    def generate_spikes(self, T):
+    def generate_spikes(self, T=None, nspikes=None):
         """Generates spikes within a time period T
         """
         return
@@ -44,11 +47,18 @@ class RegularNeuron(Neuron):
         else:
             self.T0 = T0
 
-    def generate_spikes(self, T):
+    def generate_spikes(self, T=None, nspikes=None):
         """Generates spikes within a time period T
         """
+        assert_xor(T, nspikes,
+         "must call generate_spikes with either a time period or " + 
+         "a number of spikes but not both"
+        )
         if self.spike_rate > 0.:
-            nspikes = int(T/self.period)
+            if T:
+                nspikes = int(T/self.period)
+            else:
+                assert nspikes >= 0., "number of spikes must be nonnegative"
             times = self.period * np.arange(nspikes) + self.T0
             weights = self.weight * np.ones(nspikes, dtype=int)
         else:
@@ -63,12 +73,22 @@ class PoissonNeuron(Neuron):
     def __init__(self, spike_rate, weight):
         super(PoissonNeuron, self).__init__(spike_rate, weight)
     
-    def generate_spikes(self, T):
+    def generate_spikes(self, T=None, nspikes=None):
         """Generates spikes within a time period T
         """
+        assert_xor(T, nspikes,
+         "must call generate_spikes with either a time period or " + 
+         "a number of spikes but not both"
+        )
         if self.spike_rate > 0.:
-            nspikes = np.random.poisson(self.spike_rate * T)
-            times = np.sort(np.random.uniform(low=0., high=T, size=nspikes))
+            if T:
+                nspikes = np.random.poisson(self.spike_rate * T)
+                times = np.sort(np.random.uniform(low=0., high=T,
+                    size=nspikes))
+            else:
+                assert nspikes >= 0., "number of spikes must be nonnegative"
+                times = np.cumsum(np.random.exponential(1./self.spike_rate,
+                    size=nspikes))
             weights = self.weight * np.ones(nspikes, dtype=int)
         else:
             times = np.array([])
