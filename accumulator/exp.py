@@ -7,9 +7,17 @@ from plot_utils import rasterplot
 from pool import Pool
 from scipy.stats import gamma
 
-def run_experiment(N, input_rates, weights, threshold, T=1.,
-                   neuron_model=RegularNeuron):
-    """Runs an experiment with regular spiking neurons
+def run_experiment(pool, T=None):
+    """Runs an experiment
+    """
+    spks_in = pool.gen_nrn_spikes(T=T)
+    merged_spks_in = pool.merge_spikes(spks_in)
+    spks_out, acc_state = pool.gen_acc_spikes(merged_spks_in)
+    return spks_in, acc_state, spks_out
+
+def run_neuron_experiment(N, input_rates, weights, threshold,
+    T=None, nspikes=None, neuron_model=RegularNeuron):
+    """Run an experiment with a single neuron
     """
     spike_rates = set_list_var(input_rates, N)
     weights = set_list_var(weights, N)
@@ -18,7 +26,7 @@ def run_experiment(N, input_rates, weights, threshold, T=1.,
                spike_rate, weight in
                zip(spike_rates, weights)]
     pool = Pool(neurons=neurons, threshold=threshold)
-    spks_in = pool.gen_nrn_spikes(T=T)
+    spks_in = pool.gen_nrn_spikes(T=T, nspikes=nspikes)
     
     merged_spks_in = pool.merge_spikes(spks_in)
     spks_out, acc_state = pool.gen_acc_spikes(merged_spks_in)
@@ -79,7 +87,7 @@ def plot_timeseries(spks_in, acc_state, spks_out, tmin=None, tmax=None,
     axs[2].set_title('Accumulator Output Spikes')
 
 def plot_isi(spks, bins=50, name="Output ", normed=False,
-        plot_isi=True, plot_acorr=True, plot_hist=True
+        plot_isi_bool=True, plot_acorr=True, plot_hist=True
     ):
     """Plots the interspike intervals and their autocorrelation and histogram
     
@@ -91,7 +99,7 @@ def plot_isi(spks, bins=50, name="Output ", normed=False,
     spks.times = np.array(spks.times)
     spks.weights = np.array(spks.weights)
     isi = np.diff(spks.times)
-    if plot_isi:
+    if plot_isi_bool:
         fig, ax = plt.subplots(nrows=1, figsize=(12,3))
         ax.plot(isi, 'o')
         ax.set_title(name + 'Interspike Intervals')
@@ -102,11 +110,19 @@ def plot_isi(spks, bins=50, name="Output ", normed=False,
 
     if plot_acorr:
         isi_centered = isi - np.mean(isi)
-        isi_acorr = np.correlate(isi_centered, isi_centered, 'full')
+        isi_var = np.var(isi)
+        if len(np.unique(isi.round(decimals=12))) > 1:
+            # compute autocorrelation
+            isi_acorr = np.correlate(isi_centered, isi_centered, 'full')/isi_var
+            analysis = "Autocorrelation"
+        else:
+            # if process is deterministic, autocorrelation is undefined
+            isi_acorr = np.correlate(isi_centered, isi_centered, 'full') 
+            analysis = "Autocovariance"
         shift = np.arange(2*len(isi_centered)-1)-len(isi_centered)
         fig, ax = plt.subplots(nrows=1, figsize=(12,3))
         ax.plot(shift, isi_acorr, 'o')
-        ax.set_title(name + 'Interspike Interval Autocorrelation')
+        ax.set_title(name + 'Interspike Interval ' + analysis)
         ax.set_xlabel('Shift')
         limit_ylim(ax)
     
@@ -143,7 +159,7 @@ def run_regular_neuron_experiment(weight, threshold):
     """Runs a simple experiment with a single neuron"""
     N = 1
     input_rates = 100 # neuron spike rate
-    spks_in, acc_state, spks_out = run_experiment(
+    spks_in, acc_state, spks_out = run_neuron_experiment(
         N=N, input_rates=input_rates, weights=weight,
         threshold=threshold, T=0.5
     )
@@ -151,13 +167,15 @@ def run_regular_neuron_experiment(weight, threshold):
     plot_isi(spks_out, bins=50)
 
 def run_poisson_neuron_experiment(weight, threshold,
-        make_timeseries_plot=True, make_isi_plot=True, make_in_isi_plot=True
+        make_timeseries_plot=True, make_isi_plot=True, make_in_isi_plot=True,
+        make_out_isi_plot=True,
+        T=20, nspikes=None
     ):
     N = 1
     input_rates = 1000 # neuron spike rate
-    spks_in, acc_state, spks_out = run_experiment(
+    spks_in, acc_state, spks_out = run_neuron_experiment(
         N=N, input_rates=input_rates, weights=weight, threshold=threshold,
-        T=20., neuron_model=PoissonNeuron
+        T=T, nspikes=nspikes, neuron_model=PoissonNeuron
     )
     if make_timeseries_plot:
         plot_timeseries(spks_in, acc_state, spks_out, tmax=0.05,
@@ -165,7 +183,7 @@ def run_poisson_neuron_experiment(weight, threshold,
     if make_isi_plot:
         if make_in_isi_plot:
             ax = plot_isi(spks_in[0], bins=100, name="Input ", normed=True,
-                plot_isi=False, plot_acorr=False)
+                plot_isi_bool=False, plot_acorr=False)
             tmin = 0.
             tmax = ax['hist'].get_xlim()[1]
             t = np.linspace(tmin, tmax)
@@ -174,7 +192,8 @@ def run_poisson_neuron_experiment(weight, threshold,
             ax['hist'].legend(loc='best')
             ax['hist'].set_ylabel('normalized counts')
             ax['hist'].set_xlim(0, tmax)
-        ax = plot_isi(spks_out, bins=100, normed=True)
+        ax = plot_isi(spks_out, bins=100, normed=True,
+            plot_isi_bool=make_out_isi_plot)
         tmin = 0.
         tmax = ax['hist'].get_xlim()[1]
         t = np.linspace(tmin, tmax)
@@ -184,4 +203,11 @@ def run_poisson_neuron_experiment(weight, threshold,
         ax['hist'].legend(loc='best')
         ax['hist'].set_ylabel('normalized counts')
         xlims = ax['hist'].set_xlim(0, tmax)
+
+def compute_out_rate(pool, threshold):
+    """Computes the output spike rate of an accumulator
+    """
+    rates = np.array([neuron.spike_rate for neuron in pool.neurons])
+    weights = np.array([neuron.weight for neuron in pool.neurons])
+    return np.sum(rates*weights)/threshold
 

@@ -43,7 +43,10 @@ class RegularNeuron(Neuron):
         if spike_rate > 0.:
             self.period = 1./spike_rate
         if T0 == None:
-            self.T0 = np.random.uniform(0, self.period)
+            if spike_rate > 0.:
+                self.T0 = np.random.uniform(0, self.period)
+            else:
+                self.T0 = 0.
         else:
             self.T0 = T0
 

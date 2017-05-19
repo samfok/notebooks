@@ -1,7 +1,8 @@
 # defines a pool containing neurons and an accumulator
 import numpy as np
 from acc import Accumulator
-from datatypes import SpikeTrain
+from neuron import RegularNeuron
+from datatypes import SpikeTrain, set_list_var
 
 class Pool(object):
     """A pool of neurons with an accumulator
@@ -14,10 +15,11 @@ class Pool(object):
         self.neurons = neurons
         self.acc = Accumulator(threshold)
 
-    def gen_nrn_spikes(self, T):
+    def gen_nrn_spikes(self, T=None, nspikes=None):
         """Generate spikes from neurons and merge them in a single spike train
         """
-        spikes = [neuron.generate_spikes(T) for neuron in self.neurons]
+        spikes = [neuron.generate_spikes(T=T, nspikes=nspikes)
+            for neuron in self.neurons]
         return spikes
 
     def merge_spikes(self, spikes_in):
@@ -38,3 +40,16 @@ class Pool(object):
         """
         spikes_out, acc_state = self.acc.accumulate(spikes_in)
         return spikes_out, acc_state
+
+def build_pool(N, input_rates, weights, threshold, neuron_model=RegularNeuron):
+    """Utility for building a Pool
+    """
+    spike_rates = set_list_var(input_rates, N)
+    weights = set_list_var(weights, N)
+    
+    neurons = [neuron_model(spike_rate, weight) for 
+               spike_rate, weight in
+               zip(spike_rates, weights)]
+    pool = Pool(neurons=neurons, threshold=threshold)
+    return pool
+
