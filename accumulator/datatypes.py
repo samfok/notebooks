@@ -16,3 +16,11 @@ class AccumulatorState(object):
     def __init__(self, time, state):
         self.time = time
         self.state = state
+
+def set_list_var(x, N):
+    """Expands a variable into a list if it is not already a list
+    """
+    if not hasattr(x, "__iter__"):
+        return [x for n in range(N)]
+    else:
+        return x
