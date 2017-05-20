@@ -166,6 +166,16 @@ def run_regular_neuron_experiment(weight, threshold):
     plot_timeseries(spks_in, acc_state, spks_out, threshold=threshold)
     plot_isi(spks_out, bins=50)
 
+def plot_gamma(ax, shape, scale):
+    """plot a gamma distribution on the supplied axis"""
+    tmin = max(0, ax.get_xlim()[0])
+    tmax = ax.get_xlim()[1]
+    t = np.linspace(tmin, tmax)
+    ax.plot(t, gamma.pdf(t, a=shape, scale=scale), 'r',
+        label="gamma pdf, $shape=%.1f, scale=%f$"%(shape, scale))
+    xlims = ax.set_xlim(tmin, tmax)
+    return ax
+
 def run_poisson_neuron_experiment(weight, threshold,
         make_timeseries_plot=True, make_isi_plot=True, make_in_isi_plot=True,
         make_out_isi_plot=True,
@@ -194,15 +204,19 @@ def run_poisson_neuron_experiment(weight, threshold,
             ax['hist'].set_xlim(0, tmax)
         ax = plot_isi(spks_out, bins=100, normed=True,
             plot_isi_bool=make_out_isi_plot)
-        tmin = 0.
-        tmax = ax['hist'].get_xlim()[1]
-        t = np.linspace(tmin, tmax)
-        k = float(threshold)/weight
-        ax['hist'].plot(t, gamma.pdf(t, a=k, scale=1./input_rates), 'r',
-        label="gamma pdf, $shape=%.1f, scale=1/%.0f$"%(k, input_rates))
+        plot_gamma(ax['hist'], shape=float(threshold)/weight,
+            scale=1./input_rates)
+        # tmin = 0.
+        # tmax = ax['hist'].get_xlim()[1]
+        # t = np.linspace(tmin, tmax)
+        # k = float(threshold)/weight
+        # ax['hist'].plot(t, gamma.pdf(t, a=k, scale=1./input_rates), 'r',
+        # label="gamma pdf, $shape=%.1f, scale=1/%.0f$"%(k, input_rates))
         ax['hist'].legend(loc='best')
         ax['hist'].set_ylabel('normalized counts')
         xlims = ax['hist'].set_xlim(0, tmax)
+    ret = {'spks_in':spks_in, 'acc_state':acc_state,'spks_out':spks_out}
+    return ret
 
 def compute_out_rate(pool, threshold):
     """Computes the output spike rate of an accumulator

@@ -4,11 +4,17 @@ class SpikeTrain(object):
     """Container for trains of spikes
     """
     def __init__(self, times, weights):
-        self.times = times
+        if not hasattr(weights, "__iter__"):
+            self.times = [times]
+        else:
+            self.times = times
         if not hasattr(weights, "__iter__"):
             self.weights = [weights for n in range(len(self.times))]
         else:
             self.weights = weights
+
+    def __getitem__(self, index):
+        return SpikeTrain(self.times[index], self.weights[index])
 
 class AccumulatorState(object):
     """Container for accumulator state
@@ -16,6 +22,9 @@ class AccumulatorState(object):
     def __init__(self, time, state):
         self.time = time
         self.state = state
+
+    def __getitem__(self, index):
+        return AccumulatorState(self.time[index], self.state[index])
 
 def set_list_var(x, N):
     """Expands a variable into a list if it is not already a list
