@@ -1,4 +1,5 @@
 # defines data types used in accumulator experiments
+import numpy as np
 
 class SpikeTrain(object):
     """Container for trains of spikes
@@ -14,7 +15,8 @@ class SpikeTrain(object):
             self.weights = weights
 
     def __getitem__(self, index):
-        return SpikeTrain(self.times[index], self.weights[index])
+        return SpikeTrain(
+            np.array(self.times)[index], np.array(self.weights)[index])
 
 class AccumulatorState(object):
     """Container for accumulator state

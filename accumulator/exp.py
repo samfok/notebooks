@@ -65,10 +65,12 @@ def plot_timeseries(spks_in, acc_state, spks_out, tmin=None, tmax=None,
     if len(out_weights) == 1:
         rasterplot(spks_out, axs[2])
     else:
-        spks_out_p = SpikeTrain(
-            np.array(spks_out.times)[np.array(spks_out.weights) == 1], 1)
-        spks_out_m = SpikeTrain(
-            np.array(spks_out.times)[np.array(spks_out.weights) == -1], -1)
+        spks_out_p = spks_out[np.array(spks_out.weights) == 1]
+        spks_out_m = spks_out[np.array(spks_out.weights) == -1]
+        # spks_out_p = SpikeTrain(
+        #     np.array(spks_out.times)[np.array(spks_out.weights) == 1], 1)
+        # spks_out_m = SpikeTrain(
+        #     np.array(spks_out.times)[np.array(spks_out.weights) == -1], -1)
         ax = rasterplot([spks_out_p, spks_out_m], axs[2])
         ax.set_yticklabels([1, -1])
         ax.set_ylabel('Weight')
@@ -86,8 +88,48 @@ def plot_timeseries(spks_in, acc_state, spks_out, tmin=None, tmax=None,
     axs[1].set_title('Accumulator State')
     axs[2].set_title('Accumulator Output Spikes')
 
+def plot_acorr(x, ax=None, title="", xlabel="Shift", ylabel="",
+               append_analysis=True):
+    """Plot the autocorrelation
+
+    If variance is too small (i.e. for a deterministic process),
+    falls back to plotting autocovariance
+    """
+    x_centered = x - np.mean(x)
+    x_var = np.var(x)
+    if len(np.unique(x.round(decimals=12))) > 1:
+        # compute autocorrelation
+        x_acorr = np.correlate(x_centered, x_centered, 'full')/x_var
+        analysis_mode = "Autocorrelation"
+    else:
+        # if process is deterministic, autocorrelation is undefined
+        x_acorr = np.correlate(x_centered, x_centered, 'full') 
+        analysis_mode = "Autocovariance"
+    shift = np.arange(2*len(x_centered)-1)-len(x_centered)
+    if ax is None:
+        fig, ax = plt.subplots(nrows=1, figsize=(12,3))
+    ax.plot(shift, x_acorr, 'o')
+    if append_analysis:
+        ax.set_title(title+analysis_mode)
+    else:
+        ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    limit_ylim(ax)
+    return ax
+
+def plot_hist(x, ax=None, bins=50, normed=False,
+              title="Histogram", xlabel="", ylabel=""):
+    if ax is None:
+        fig, ax = plt.subplots(nrows=1, figsize=(12,3))
+    n, bins, patches = ax.hist(x, bins, normed=normed)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    return ax
+
 def plot_isi(spks, bins=50, name="Output ", normed=False,
-        plot_isi_bool=True, plot_acorr=True, plot_hist=True
+        isi_plot=True, acorr_plot=True, hist_plot=True,
     ):
     """Plots the interspike intervals and their autocorrelation and histogram
     
@@ -99,7 +141,7 @@ def plot_isi(spks, bins=50, name="Output ", normed=False,
     spks.times = np.array(spks.times)
     spks.weights = np.array(spks.weights)
     isi = np.diff(spks.times)
-    if plot_isi_bool:
+    if isi_plot:
         fig, ax = plt.subplots(nrows=1, figsize=(12,3))
         ax.plot(isi, 'o')
         ax.set_title(name + 'Interspike Intervals')
@@ -108,50 +150,35 @@ def plot_isi(spks, bins=50, name="Output ", normed=False,
         limit_ylim(ax)
         ret['plot'] = ax
 
-    if plot_acorr:
-        isi_centered = isi - np.mean(isi)
-        isi_var = np.var(isi)
-        if len(np.unique(isi.round(decimals=12))) > 1:
-            # compute autocorrelation
-            isi_acorr = np.correlate(isi_centered, isi_centered, 'full')/isi_var
-            analysis = "Autocorrelation"
-        else:
-            # if process is deterministic, autocorrelation is undefined
-            isi_acorr = np.correlate(isi_centered, isi_centered, 'full') 
-            analysis = "Autocovariance"
-        shift = np.arange(2*len(isi_centered)-1)-len(isi_centered)
-        fig, ax = plt.subplots(nrows=1, figsize=(12,3))
-        ax.plot(shift, isi_acorr, 'o')
-        ax.set_title(name + 'Interspike Interval ' + analysis)
-        ax.set_xlabel('Shift')
-        limit_ylim(ax)
+    if acorr_plot:
+        ax = plot_acorr(isi)
+        ax.set_title(name + 'Interspike Interval ' + ax.get_title())
+        ret['acorr'] = ax
     
 
-    if plot_hist:
+    if hist_plot:
         if len(np.unique(isi.round(decimals=12))) > 1:
-            fig, ax = plt.subplots(nrows=1, figsize=(12,3))
-            n, bins, patches = ax.hist(isi, bins, normed=normed)
-            ax.set_title(name + 'ISI Histogram (%d ISIs)'%len(isi))
-            ax.set_xlabel('Time')
-            ax.set_ylabel('Counts')
-            ret['hist'] = ax
+            ret['hist'] = plot_hist(
+                isi, bins=bins, normed=normed,
+                title=name + 'ISI Histogram (%d ISIs)'%len(isi),
+                xlabel='Time'
+            )
 
         # split into +1/-1 weights
         if(len(np.unique(spks.weights)) == 2):
             fig, axs = plt.subplots(nrows=2, figsize=(12,6), sharex=True)        
-
-            isi = np.diff(spks.times[spks.weights == 1])
-            n, bins, patches = axs[0].hist(isi, bins, normed=normed)
-            axs[0].set_title(name + '+1 Weighted ISI Histogram (%d spikes)'%len(isi))
-            axs[0].set_xlabel('Time')
-            axs[0].set_ylabel('Counts')
-            
-            isi = np.diff(spks.times[spks.weights == -1])
-            n, bins, patches = axs[1].hist(isi, bins, normed=normed)
-            axs[1].set_title(name + '-1 Weighted ISI Histogram (%d spikes)'%len(isi))
-            axs[1].set_xlabel('Time')
-            axs[1].set_ylabel('Counts')
-
+            plot_hist(
+                spks.times[spks.weights == 1], ax=axs[0], normed=normed,
+                title=name + '+1 Weighted ISI Histogram (%d spikes)'%len(
+                    spks.times[spks.weights == 1]),
+                xlabel='Time'
+            )
+            plot_hist(
+                spks.times[spks.weights == -1], ax=axs[1], normed=normed,
+                title=name + '-1 Weighted ISI Histogram (%d spikes)'%len(
+                    spks.times[spks.weights == -1]),
+                xlabel='Time'
+            )
             ret['split_hist'] = axs
     return ret
 
@@ -177,8 +204,8 @@ def plot_gamma(ax, shape, scale):
     return ax
 
 def run_poisson_neuron_experiment(weight, threshold,
-        make_timeseries_plot=True, make_isi_plot=True, make_in_isi_plot=True,
-        make_out_isi_plot=True,
+        timeseries_plot=True, isi_plot=True, in_isi_plot=True,
+        out_isi_plot=True,
         T=20, nspikes=None
     ):
     N = 1
@@ -187,13 +214,13 @@ def run_poisson_neuron_experiment(weight, threshold,
         N=N, input_rates=input_rates, weights=weight, threshold=threshold,
         T=T, nspikes=nspikes, neuron_model=PoissonNeuron
     )
-    if make_timeseries_plot:
+    if timeseries_plot:
         plot_timeseries(spks_in, acc_state, spks_out, tmax=0.05,
              threshold=threshold)
-    if make_isi_plot:
-        if make_in_isi_plot:
+    if isi_plot:
+        if in_isi_plot:
             ax = plot_isi(spks_in[0], bins=100, name="Input ", normed=True,
-                plot_isi_bool=False, plot_acorr=False)
+                isi_plot=False, acorr_plot=False)
             tmin = 0.
             tmax = ax['hist'].get_xlim()[1]
             t = np.linspace(tmin, tmax)
@@ -203,7 +230,7 @@ def run_poisson_neuron_experiment(weight, threshold,
             ax['hist'].set_ylabel('normalized counts')
             ax['hist'].set_xlim(0, tmax)
         ax = plot_isi(spks_out, bins=100, normed=True,
-            plot_isi_bool=make_out_isi_plot)
+            isi_plot=out_isi_plot)
         plot_gamma(ax['hist'], shape=float(threshold)/weight,
             scale=1./input_rates)
         # tmin = 0.
@@ -214,7 +241,6 @@ def run_poisson_neuron_experiment(weight, threshold,
         # label="gamma pdf, $shape=%.1f, scale=1/%.0f$"%(k, input_rates))
         ax['hist'].legend(loc='best')
         ax['hist'].set_ylabel('normalized counts')
-        xlims = ax['hist'].set_xlim(0, tmax)
     ret = {'spks_in':spks_in, 'acc_state':acc_state,'spks_out':spks_out}
     return ret
 
@@ -224,4 +250,3 @@ def compute_out_rate(pool, threshold):
     rates = np.array([neuron.spike_rate for neuron in pool.neurons])
     weights = np.array([neuron.weight for neuron in pool.neurons])
     return np.sum(rates*weights)/threshold
-
