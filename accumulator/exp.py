@@ -97,18 +97,21 @@ def plot_acorr(x, ax=None, title="", xlabel="Shift", ylabel="",
     """
     x_centered = x - np.mean(x)
     x_var = np.var(x)
+    x_len = len(x)
+    x_centered_sample = x_centered[:int(x_len//2)]
     if len(np.unique(x.round(decimals=12))) > 1:
         # compute autocorrelation
-        x_acorr = np.correlate(x_centered, x_centered, 'full')/x_var
+        x_acorr = np.correlate(x_centered, x_centered_sample, 'valid')/x_var
         analysis_mode = "Autocorrelation"
     else:
         # if process is deterministic, autocorrelation is undefined
-        x_acorr = np.correlate(x_centered, x_centered, 'full') 
+        # use the autocovariance instead
+        x_acorr = np.correlate(x_centered, x_centered_sample, 'valid') 
         analysis_mode = "Autocovariance"
-    shift = np.arange(2*len(x_centered)-1)-len(x_centered)
+
     if ax is None:
         fig, ax = plt.subplots(nrows=1, figsize=(12,3))
-    ax.plot(shift, x_acorr, 'o')
+    ax.plot(x_acorr[:100], 'o')
     if append_analysis:
         ax.set_title(title+analysis_mode)
     else:
@@ -143,7 +146,7 @@ def plot_isi(spks, bins=50, name="Output ", normed=False,
     isi = np.diff(spks.times)
     if isi_plot:
         fig, ax = plt.subplots(nrows=1, figsize=(12,3))
-        ax.plot(isi, 'o')
+        ax.plot(isi[:100], 'o')
         ax.set_title(name + 'Interspike Intervals')
         ax.set_xlabel('Interval Index')
         ax.set_ylabel('Interval Duration')
