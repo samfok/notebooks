@@ -12,7 +12,7 @@ from scipy.signal import (
 from ipywidgets import interact
 from bokeh.io import push_notebook, show
 from bokeh.plotting import figure
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, column
 
 
 def analyze_lti(lti, t=np.linspace(0,10,100)):
@@ -38,11 +38,31 @@ def analyze_lti(lti, t=np.linspace(0,10,100)):
     )
     g_step = fig_step.line(x=t_step, y=y_step)
 
-    fig_pz = figure(title="pole-zero plot", x_range=(-4, 1), y_range=(-2,2))
+    fig_pz = figure(title="poles and zeroes", x_range=(-4, 1), y_range=(-2,2))
     g_poles = fig_pz.circle(
         x=lti.sys.poles.real, y=lti.sys.poles.imag, size=10, fill_alpha=0
     )
     g_rootlocus = fig_pz.line(x=[0, -10], y=[0, 0], line_color='red')
+
+    w, mag, phase, = bode(lti.sys)
+    fig_bode_mag = figure(x_axis_type="log")
+    g_bode_mag = fig_bode_mag.line(w, mag)
+    fig_bode_phase = figure(x_axis_type="log")
+    g_bode_phase = fig_bode_phase.line(w, phase)
+
+    fig_bode = gridplot(
+        [fig_bode_mag], [fig_bode_phase], nrows=2,
+        plot_width=300, plot_height=150,
+        sizing_mode="fixed")
+
+    grid = gridplot(
+        [fig_impulse, fig_step],
+        [fig_pz, fig_bode],
+        plot_width=300, plot_height=300,
+        sizing_mode="fixed"
+    )
+
+    show(grid, notebook_handle=True)
 
     def update(**kwargs):
         lti.update(**kwargs)
@@ -54,15 +74,14 @@ def analyze_lti(lti, t=np.linspace(0,10,100)):
 
         g_poles.data_source.data['x'] = lti.sys.poles.real
         g_poles.data_source.data['y'] = lti.sys.poles.imag
+
+        w, mag, phase, = bode(lti.sys)
+        g_bode_mag.data_source.data['x'] = w
+        g_bode_mag.data_source.data['y'] = mag
+        g_bode_phase.data_source.data['x'] = w
+        g_bode_phase.data_source.data['y'] = phase
+
         push_notebook()
-
-    grid = gridplot(
-        [fig_impulse, fig_step],
-        [fig_pz, None],
-        plot_width=300, plot_height=300
-    )
-
-    show(grid, notebook_handle=True)
 
     interact(update, **lti.update_kwargs)
 
